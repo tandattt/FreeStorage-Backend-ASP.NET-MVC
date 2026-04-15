@@ -1,0 +1,457 @@
+@model PhotosIndexVm
+@{
+    ViewData["Title"] = "Ảnh của bạn";
+    var from = Model.TotalCount == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
+    var to = Model.TotalCount == 0 ? 0 : Math.Min(Model.Page * Model.PageSize, Model.TotalCount);
+    var compactGrid = Model.Cols >= 8;
+}
+
+@if (TempData["Message"] is string msg)
+{
+    <div class="alert alert-success border-0 shadow-sm mb-4" style="border-radius: var(--radius-editorial);" role="alert">@msg</div>
+}
+<div id="photo-upload-flash-host"></div>
+<div id="photo-sync-root" class="d-none" data-sync-url="@Url.Action("Sync", "Photos")" data-index-url="@Url.Action("Index", "Photos")"
+     data-revision="@Model.Revision" data-page="@Model.Page" data-page-size="@Model.PageSize" data-cols="@Model.Cols"></div>
+
+<div class="d-flex flex-column flex-md-row align-items-md-end justify-content-md-between gap-4 mb-4">
+    <div>
+        <h1 class="editorial-page-title mb-2">Ảnh đã tải lên</h1>
+        <p class="editorial-page-sub mb-0">Quản lý và xem album riêng tư của bạn — giao diện tối giản, tập trung vào ảnh.</p>
+    </div>
+    <a class="btn btn-primary d-inline-flex align-items-center gap-2 align-self-stretch align-self-md-auto px-4 py-2" asp-action="Upload">
+        <span class="material-symbols-outlined" style="font-size: 1.25rem;">upload</span>
+        Tải ảnh mới
+    </a>
+</div>
+
+<section class="editorial-filters">
+    <div class="storage-quota storage-quota-inline @(Model.TotalCount > 0 ? "mb-3 mb-lg-4" : "mb-0")" role="region" aria-label="Dung lượng album">
+        <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">
+            <span class="editorial-label d-block mb-0">Dung lượng album</span>
+            <span class="storage-quota-inline-value fw-semibold" style="color: var(--ed-primary);">
+                <span class="storage-used-label" id="photo-storage-used">@Model.UsedSizeLabel</span><span class="text-secondary fw-normal"> / 5 GB</span>
+            </span>
+        </div>
+        <div class="progress storage-quota-progress mb-0" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@Model.QuotaPercent" aria-label="Đã dùng @Model.QuotaPercent phần trăm hạn mức">
+            <div class="progress-bar storage-quota-bar" id="photo-quota-bar" style="width: @Model.QuotaPercent%"></div>
+        </div>
+    </div>
+@if (Model.TotalCount > 0)
+{
+        <div id="photo-filters-row" class="d-flex flex-column flex-lg-row flex-wrap align-items-lg-end justify-content-lg-between gap-3 gap-lg-4">
+            <form method="get" class="d-flex flex-wrap align-items-end gap-3 gap-md-4" id="photoGridPrefs">
+                <input type="hidden" name="page" value="1" />
+                <input type="hidden" name="cols" id="colsVal" value="@Model.Cols" />
+                <div class="d-none d-md-block">
+                    <label for="colsSel" class="editorial-label d-block">Số cột (màn hình lớn)</label>
+                    <select id="colsSel" class="form-select editorial-select" style="min-width: 10rem"
+                            onchange="document.getElementById('colsVal').value=this.value;this.form.submit()">
+                        @foreach (var c in new[] { 2, 3, 4, 6, 8, 10 })
+                        {
+                            if (Model.Cols == c)
+                            {
+                                <option value="@c" selected>@c cột</option>
+                            }
+                            else
+                            {
+                                <option value="@c">@c cột</option>
+                            }
+                        }
+                    </select>
+                </div>
+                <div>
+                    <label for="pageSizeSel" class="editorial-label d-block">Ảnh mỗi trang</label>
+                    <select id="pageSizeSel" name="pageSize" class="form-select editorial-select" style="min-width: 10rem" onchange="this.form.submit()">
+                        @foreach (var s in new[] { 6, 12, 24, 48 })
+                        {
+                            if (Model.PageSize == s)
+                            {
+                                <option value="@s" selected>@s ảnh</option>
+                            }
+                            else
+                            {
+                                <option value="@s">@s ảnh</option>
+                            }
+                        }
+                    </select>
+                </div>
+            </form>
+            <p class="editorial-stat mb-0" id="photo-page-stat">Hiển thị <strong>@from</strong>–<strong>@to</strong> trong <strong>@Model.TotalCount</strong> ảnh</p>
+        </div>
+}
+</section>
+
+@if (Model.TotalCount == 0)
+{
+    <div class="empty-state surface-card p-5 text-center">
+        <p class="text-secondary mb-4 mb-md-3">Chưa có ảnh nào.</p>
+        <a class="btn btn-primary px-4" asp-action="Upload">Tải ảnh đầu tiên</a>
+    </div>
+}
+else
+{
+    <div class="photo-grid-responsive photo-grid-responsive--library" id="photo-grid" style="--photo-cols: @Model.Cols">
+        @foreach (var item in Model.Items)
+        {
+            <article class="card photo-card editorial-card border-0 h-100 @(compactGrid ? "photo-card-compact" : "")" data-photo-id="@item.Id" data-photo-created-at="@item.CreatedAt.ToString("o")" data-photo-pending="@(item.IsPending ? "true" : "false")" data-photo-failed="@(item.IsFailed ? "true" : "false")" data-photo-compact="@(compactGrid ? "true" : "false")">
+                <div class="photo-thumb editorial-thumb position-relative @(item.IsPending || item.IsFailed ? "" : "photo-thumb--zoom")">
+                    @if (item.IsPending)
+                    {
+                        <div class="photo-placeholder d-flex flex-column align-items-center justify-content-center h-100 w-100">
+                            <div class="spinner-border text-primary mb-2" role="status" aria-hidden="true"></div>
+                            <span class="small text-secondary">Đang tải lên…</span>
+                            <span class="photo-pending-wait-note small text-secondary mt-1 text-center px-1 d-none" lang="vi">Đợi thêm 5–10 phút nhé.</span>
+                        </div>
+                    }
+                    else if (item.IsFailed)
+                    {
+                        <div class="photo-placeholder photo-placeholder--failed d-flex flex-column align-items-center justify-content-center h-100 w-100 px-2 text-center">
+                            <span class="material-symbols-outlined text-danger mb-1" style="font-size: 2rem;" aria-hidden="true">error</span>
+                            <span class="small text-danger fw-semibold">Không tải được ảnh</span>
+                            <span class="small text-secondary mt-1">Thử tải lên ảnh khác.</span>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="position-relative w-100 h-100 photo-thumb-inner">
+                            <img src="@item.ProxyUrl" alt="Ảnh đã tải" loading="lazy" decoding="async" class="photo-img" />
+                            <button type="button"
+                                    class="photo-zoom-open btn position-absolute top-0 start-0 w-100 h-100 p-0 border-0 bg-transparent"
+                                    data-bs-toggle="modal" data-bs-target="#photoLightbox"
+                                    data-img="@item.ProxyUrl" data-download="@item.DownloadUrl"
+                                    aria-label="Xem ảnh phóng to"></button>
+                        </div>
+                    }
+                </div>
+                <div class="card-body photo-card__details d-none d-md-flex flex-column p-4 @(compactGrid ? "pb-2 pt-3" : "")">
+                    <div class="mb-3 @(compactGrid ? "mb-0" : "")">
+                        <p class="photo-meta-label">Đã tải lên</p>
+                        <p class="small mb-0 photo-date" style="color: var(--ed-on-surface);">@item.CreatedAt.LocalDateTime.ToString("g")</p>
+                    </div>
+                    @if (!compactGrid)
+                    {
+                        <div class="mt-auto photo-dl-slot">
+                            @if (item.IsPending)
+                            {
+                                <button type="button" class="btn-editorial-download" disabled style="opacity: 0.5; cursor: not-allowed;">
+                                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">download</span>
+                                    Tải xuống
+                                </button>
+                            }
+                            else if (item.IsFailed)
+                            {
+                                <button type="button" class="btn-editorial-download" disabled style="opacity: 0.5; cursor: not-allowed;">
+                                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">download</span>
+                                    Xin lũi vì quá kém
+                                </button>
+                            }
+                            else
+                            {
+                                <a class="btn-editorial-download photo-download" href="@item.DownloadUrl" download>
+                                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">download</span>
+                                    Tải xuống
+                                </a>
+                            }
+                        </div>
+                    }
+                </div>
+            </article>
+        }
+    </div>
+
+    <div class="modal fade photo-lightbox" id="photoLightbox" tabindex="-1" aria-labelledby="photoLightboxLabel" aria-hidden="true">
+        <div class="modal-dialog photo-lightbox-dialog modal-dialog-centered modal-xl modal-fullscreen-lg-down">
+            <div class="modal-content photo-lightbox-shell border-0">
+                <div class="photo-lightbox-backdrop" aria-hidden="true"></div>
+                <button type="button" class="photo-lightbox-close" data-bs-dismiss="modal" aria-label="Đóng">
+                    <span class="material-symbols-outlined" aria-hidden="true">close</span>
+                </button>
+                <div class="photo-lightbox-stage">
+                    <div class="photo-lightbox-zoomport" id="photoLightboxZoomport" tabindex="-1" aria-label="Khu vực ảnh — cuộn chuột hoặc chụm để zoom">
+                        <img id="photoLightboxImg" src="" alt="Ảnh phóng to" class="photo-lightbox-img" draggable="false" />
+                    </div>
+                </div>
+                <div class="photo-lightbox-chrome">
+                    <p class="photo-lightbox-hint mb-0 d-md-none small text-center px-2">Chụm hai ngón để zoom · Kéo để xem khi đã phóng to · Chạm đúp ảnh để về mức ban đầu</p>
+                    <p class="photo-lightbox-hint mb-0 d-none d-md-block" id="photoLightboxLabel">Cuộn chuột để zoom · Chạm đúp ảnh để về mức ban đầu</p>
+                    <a id="photoLightboxDl" class="photo-lightbox-save" href="#" download>
+                        <span class="material-symbols-outlined" aria-hidden="true">download</span>
+                        Lưu ảnh
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="photo-pagination-wrap" class="@(Model.TotalPages > 1 ? "mt-5" : "d-none")">
+        @if (Model.TotalPages > 1)
+        {
+            <nav class="d-flex justify-content-center align-items-center gap-3 gap-md-5 editorial-pagination" aria-label="Phân trang ảnh">
+                <ul class="pagination mb-0 d-flex align-items-center flex-wrap justify-content-center gap-2">
+                    <li class="page-item @(Model.Page <= 1 ? "disabled" : null)">
+                        <a class="page-link"
+                           asp-action="Index"
+                           asp-route-page="@(Model.Page - 1)"
+                           asp-route-pageSize="@Model.PageSize"
+                           asp-route-cols="@Model.Cols"
+                           tabindex="@(Model.Page <= 1 ? "-1" : null)">
+                            <span class="material-symbols-outlined" style="font-size: 1.25rem;">chevron_left</span>
+                            Trước
+                        </a>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-info border-0 bg-transparent">Trang @Model.Page / @Model.TotalPages</span>
+                    </li>
+                    <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : null)">
+                        <a class="page-link"
+                           asp-action="Index"
+                           asp-route-page="@(Model.Page + 1)"
+                           asp-route-pageSize="@Model.PageSize"
+                           asp-route-cols="@Model.Cols"
+                           tabindex="@(Model.Page >= Model.TotalPages ? "-1" : null)">
+                            Sau
+                            <span class="material-symbols-outlined" style="font-size: 1.25rem;">chevron_right</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        }
+    </div>
+}
+
+@section Scripts {
+    <script>
+        (function () {
+            var host = document.getElementById('photo-upload-flash-host');
+            if (!host) return;
+
+            function showFlash(text) {
+                if (!text) return;
+                host.innerHTML = '';
+                var d = document.createElement('div');
+                d.className = 'alert alert-success border-0 shadow-sm mb-4';
+                d.style.borderRadius = 'var(--radius-editorial)';
+                d.setAttribute('role', 'alert');
+                d.textContent = text;
+                host.appendChild(d);
+            }
+
+            function tryConsume() {
+                try {
+                    var raw = localStorage.getItem('photoUploadFlash');
+                    if (!raw) return;
+                    localStorage.removeItem('photoUploadFlash');
+                    var o = JSON.parse(raw);
+                    if (o && o.message) showFlash(o.message);
+                } catch (e) { /* ignore */ }
+            }
+
+            tryConsume();
+            window.addEventListener('storage', function (e) {
+                if (e.key !== 'photoUploadFlash' || !e.newValue) return;
+                try {
+                    var o = JSON.parse(e.newValue);
+                    if (o && o.message) showFlash(o.message);
+                    localStorage.removeItem('photoUploadFlash');
+                } catch (err) { /* ignore */ }
+            });
+        })();
+    </script>
+    @if (Model.TotalCount > 0)
+    {
+        <script>
+            (function () {
+                const modalEl = document.getElementById('photoLightbox');
+                if (!modalEl || typeof bootstrap === 'undefined') return;
+                modalEl.addEventListener('show.bs.modal', function (e) {
+                    const t = e.relatedTarget;
+                    if (!t || !t.classList.contains('photo-zoom-open')) return;
+                    const src = t.getAttribute('data-img') || '';
+                    const dl = t.getAttribute('data-download') || src;
+                    const img = document.getElementById('photoLightboxImg');
+                    const a = document.getElementById('photoLightboxDl');
+                    if (img) img.src = src;
+                    if (a) { a.href = dl; a.setAttribute('download', ''); }
+                });
+                modalEl.addEventListener('hidden.bs.modal', function () {
+                    const img = document.getElementById('photoLightboxImg');
+                    if (img) img.removeAttribute('src');
+                });
+            })();
+        </script>
+    }
+    <script>
+        (function () {
+            var root = document.getElementById('photo-sync-root');
+            if (!root) return;
+            var syncUrl = root.getAttribute('data-sync-url');
+            var indexUrl = root.getAttribute('data-index-url') || '';
+            var pollMs = 5000;
+
+            function escAttr(s) {
+                if (s == null || s === '') return '';
+                return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+            }
+
+            var pendingSlowNoteAfterMs = 3 * 60 * 1000;
+
+            function updatePendingSlowNotes() {
+                document.querySelectorAll('.photo-card[data-photo-pending="true"]').forEach(function (card) {
+                    var iso = card.getAttribute('data-photo-created-at');
+                    var note = card.querySelector('.photo-pending-wait-note');
+                    if (!note) return;
+                    if (!iso) {
+                        note.classList.add('d-none');
+                        return;
+                    }
+                    var t = Date.parse(iso);
+                    if (isNaN(t)) {
+                        note.classList.add('d-none');
+                        return;
+                    }
+                    if (Date.now() - t > pendingSlowNoteAfterMs) {
+                        note.classList.remove('d-none');
+                    } else {
+                        note.classList.add('d-none');
+                    }
+                });
+            }
+
+            function buildPaginationNav(d) {
+                if (d.totalPages <= 1) return '';
+                var q = function (page) {
+                    return indexUrl + '?page=' + page + '&pageSize=' + encodeURIComponent(String(d.pageSize)) + '&cols=' + encodeURIComponent(String(d.cols));
+                };
+                var prevDis = d.page <= 1 ? ' disabled' : '';
+                var nextDis = d.page >= d.totalPages ? ' disabled' : '';
+                var prevTab = d.page <= 1 ? ' tabindex="-1"' : '';
+                var nextTab = d.page >= d.totalPages ? ' tabindex="-1"' : '';
+                return '<nav class="d-flex justify-content-center align-items-center gap-3 gap-md-5 editorial-pagination" aria-label="Phân trang ảnh">' +
+                    '<ul class="pagination mb-0 d-flex align-items-center flex-wrap justify-content-center gap-2">' +
+                    '<li class="page-item' + prevDis + '"><a class="page-link" href="' + escAttr(q(d.page - 1)) + '"' + prevTab + '>' +
+                    '<span class="material-symbols-outlined" style="font-size: 1.25rem;">chevron_left</span> Trước</a></li>' +
+                    '<li class="page-item disabled"><span class="page-info border-0 bg-transparent">Trang ' + d.page + ' / ' + d.totalPages + '</span></li>' +
+                    '<li class="page-item' + nextDis + '"><a class="page-link" href="' + escAttr(q(d.page + 1)) + '"' + nextTab + '>Sau ' +
+                    '<span class="material-symbols-outlined" style="font-size: 1.25rem;">chevron_right</span></a></li></ul></nav>';
+            }
+
+            function buildCardHtml(item, compactGrid) {
+                var idStr = String(item.id != null ? item.id : item.Id);
+                var compact = compactGrid ? ' photo-card-compact' : '';
+                var thumbClass = 'photo-thumb editorial-thumb position-relative';
+                var zoomOrNot = (item.isPending || item.isFailed) ? '' : ' photo-thumb--zoom';
+                var thumbInner = '';
+                if (item.isPending) {
+                    thumbInner = '<div class="photo-placeholder d-flex flex-column align-items-center justify-content-center h-100 w-100">' +
+                        '<div class="spinner-border text-primary mb-2" role="status" aria-hidden="true"></div>' +
+                        '<span class="small text-secondary">Đang tải lên…</span>' +
+                        '<span class="photo-pending-wait-note small text-secondary mt-1 text-center px-1 d-none" lang="vi">Đợi thêm 5–10 phút nhé.</span></div>';
+                } else if (item.isFailed) {
+                    thumbInner = '<div class="photo-placeholder photo-placeholder--failed d-flex flex-column align-items-center justify-content-center h-100 w-100 px-2 text-center">' +
+                        '<span class="material-symbols-outlined text-danger mb-1" style="font-size: 2rem;" aria-hidden="true">error</span>' +
+                        '<span class="small text-danger fw-semibold">Không tải được ảnh</span>' +
+                        '<span class="small text-secondary mt-1">Thử tải lên ảnh khác.</span></div>';
+                } else {
+                    var pu = escAttr(item.proxyUrl || '');
+                    var du = escAttr(item.downloadUrl || item.proxyUrl || '');
+                    thumbInner = '<div class="position-relative w-100 h-100 photo-thumb-inner">' +
+                        '<img src="' + pu + '" alt="Ảnh đã tải" loading="lazy" decoding="async" class="photo-img" />' +
+                        '<button type="button" class="photo-zoom-open btn position-absolute top-0 start-0 w-100 h-100 p-0 border-0 bg-transparent" data-bs-toggle="modal" data-bs-target="#photoLightbox" data-img="' + pu + '" data-download="' + du + '" aria-label="Xem ảnh phóng to"></button></div>';
+                }
+                var dlPart = '';
+                if (!compactGrid) {
+                    if (item.isPending) {
+                        dlPart = '<div class="mt-auto photo-dl-slot"><button type="button" class="btn-editorial-download" disabled style="opacity: 0.5; cursor: not-allowed;">' +
+                            '<span class="material-symbols-outlined" style="font-size: 1.1rem;">download</span> Tải xuống</button></div>';
+                    } else if (item.isFailed) {
+                        dlPart = '<div class="mt-auto photo-dl-slot"><button type="button" class="btn-editorial-download" disabled style="opacity: 0.5; cursor: not-allowed;">' +
+                            '<span class="material-symbols-outlined" style="font-size: 1.1rem;">download</span> Không có file</button></div>';
+                    } else {
+                        var href = escAttr(item.downloadUrl || item.proxyUrl || '');
+                        dlPart = '<div class="mt-auto photo-dl-slot"><a class="btn-editorial-download photo-download" href="' + href + '" download>' +
+                            '<span class="material-symbols-outlined" style="font-size: 1.1rem;">download</span> Tải xuống</a></div>';
+                    }
+                }
+                var dateLabel = item.dateLabel || '';
+                var mb = compactGrid ? ' mb-0' : '';
+                var pb = compactGrid ? ' pb-2 pt-3' : '';
+                var createdIso = item.createdAt != null ? String(item.createdAt) : '';
+                return '<article class="card photo-card editorial-card border-0 h-100' + compact + '" data-photo-id="' + escAttr(idStr) + '" data-photo-created-at="' + escAttr(createdIso) + '" data-photo-pending="' + (item.isPending ? 'true' : 'false') + '" data-photo-failed="' + (item.isFailed ? 'true' : 'false') + '" data-photo-compact="' + (compactGrid ? 'true' : 'false') + '">' +
+                    '<div class="' + thumbClass + zoomOrNot + '">' + thumbInner + '</div>' +
+                    '<div class="card-body photo-card__details d-none d-md-flex flex-column p-4' + pb + '">' +
+                    '<div class="mb-3' + mb + '"><p class="photo-meta-label">Đã tải lên</p><p class="small mb-0 photo-date" style="color: var(--ed-on-surface);">' + escAttr(dateLabel) + '</p></div>' +
+                    (!compactGrid ? dlPart : '') + '</div></article>';
+            }
+
+            async function poll() {
+                var revision = root.getAttribute('data-revision') || '';
+                var page = root.getAttribute('data-page') || '1';
+                var pageSize = root.getAttribute('data-page-size') || '12';
+                var cols = root.getAttribute('data-cols') || '6';
+                var url = syncUrl + '?page=' + encodeURIComponent(page) + '&pageSize=' + encodeURIComponent(pageSize) + '&cols=' + encodeURIComponent(cols) + '&revision=' + encodeURIComponent(revision);
+                try {
+                    var res = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+                    if (!res.ok) return;
+                    var data = await res.json();
+                    if (!data.changed) {
+                        if (data.revision) root.setAttribute('data-revision', data.revision);
+                        return;
+                    }
+
+                    var hadGrid = !!document.getElementById('photo-grid');
+                    var hasItems = (data.totalCount || 0) > 0;
+                    if (hadGrid !== hasItems) {
+                        window.location.reload();
+                        return;
+                    }
+
+                    var used = document.getElementById('photo-storage-used');
+                    if (used) used.textContent = data.usedSizeLabel || '';
+                    var bar = document.getElementById('photo-quota-bar');
+                    var prog = document.querySelector('.storage-quota-progress');
+                    var qp = typeof data.quotaPercent === 'number' ? data.quotaPercent : 0;
+                    if (bar) bar.style.width = qp + '%';
+                    if (prog) {
+                        prog.setAttribute('aria-valuenow', String(qp));
+                        prog.setAttribute('aria-label', 'Đã dùng ' + qp + ' phần trăm hạn mức');
+                    }
+
+                    var stat = document.getElementById('photo-page-stat');
+                    if (stat) {
+                        stat.innerHTML = 'Hiển thị <strong>' + data.from + '</strong>–<strong>' + data.to + '</strong> trong <strong>' + data.totalCount + '</strong> ảnh';
+                    }
+
+                    var grid = document.getElementById('photo-grid');
+                    if (grid) {
+                        grid.style.setProperty('--photo-cols', String(data.cols));
+                        var items = data.items || [];
+                        var cg = !!data.compactGrid;
+                        grid.innerHTML = items.map(function (it) { return buildCardHtml(it, cg); }).join('');
+                        updatePendingSlowNotes();
+                    }
+
+                    var wrap = document.getElementById('photo-pagination-wrap');
+                    if (wrap) {
+                        if (data.totalPages > 1) {
+                            wrap.className = 'mt-5';
+                            wrap.innerHTML = buildPaginationNav(data);
+                        } else {
+                            wrap.className = 'd-none';
+                            wrap.innerHTML = '';
+                        }
+                    }
+
+                    root.setAttribute('data-revision', data.revision || '');
+                    root.setAttribute('data-page', String(data.page));
+                    root.setAttribute('data-page-size', String(data.pageSize));
+                    root.setAttribute('data-cols', String(data.cols));
+                } catch (_) { /* giữ interval */ }
+            }
+
+            setInterval(poll, pollMs);
+            updatePendingSlowNotes();
+            setInterval(updatePendingSlowNotes, 30000);
+        })();
+    </script>
+}

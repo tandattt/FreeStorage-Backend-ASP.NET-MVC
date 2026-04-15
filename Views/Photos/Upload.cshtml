@@ -1,0 +1,289 @@
+@{
+    ViewData["Title"] = "Tải ảnh";
+}
+
+<div class="mx-auto" style="max-width: 560px;">
+    <div class="mb-4">
+        <h1 class="editorial-page-title mb-2">Tải ảnh</h1>
+        <p class="editorial-page-sub mb-0">
+            Chọn một hoặc nhiều ảnh từ thiết bị (giữ Ctrl/Cmd khi chọn để chọn nhiều file). Sau khi gửi, ảnh sẽ xuất hiện trong album. Nếu ảnh lên chậm hoặc chưa thấy ngay (đặc biệt khi gửi số lượng lớn), hãy đợi thêm khoảng 5–10 phút rồi tải lại trang album.
+        </p>
+    </div>
+
+    <div class="surface-card p-4 p-md-5">
+        <form id="photo-upload-form" asp-action="Upload" method="post" enctype="multipart/form-data" class="d-grid gap-4"
+              data-index-url="@Url.Action("Index")">
+            @Html.AntiForgeryToken()
+            <div>
+                <label for="files" class="form-label fw-semibold">Chọn ảnh</label>
+                <div class="upload-zone">
+                    <p class="small text-secondary mb-2">Kéo thả hoặc bấm để chọn — có thể chọn nhiều ảnh (tự chia tối đa 150 ảnh mỗi lần gửi). Load lại trang album để xem ảnh; nếu chưa thấy đủ, đợi thêm 5–10 phút.</p>
+                    <input class="form-control border-0 bg-transparent shadow-none" type="file" name="files" id="files" accept="image/*" multiple required />
+                </div>
+                <div id="upload-multi-preview" class="rounded border border-secondary-subtle px-3 py-2 small mt-2 bg-body-secondary bg-opacity-10" hidden></div>
+            </div>
+            <div asp-validation-summary="ModelOnly" class="text-danger small"></div>
+            <div id="client-upload-errors" class="text-danger small" hidden></div>
+            <div id="upload-progress" class="mt-2" hidden>
+                <p id="upload-progress-headline" class="small fw-semibold text-body mb-1 mb-md-2"></p>
+                <div id="upload-progress-track" class="progress mb-1" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="height: 0.5rem;">
+                    <div id="upload-progress-bar" class="progress-bar bg-primary" style="width: 0%"></div>
+                </div>
+                <p id="upload-progress-detail" class="small text-secondary mb-0"></p>
+            </div>
+            <div class="d-flex flex-column flex-sm-row gap-2">
+                <button type="submit" class="btn btn-primary btn-pill flex-grow-1 py-2">Gửi ảnh</button>
+                <a asp-action="Index" class="btn btn-outline-secondary btn-pill flex-grow-1 py-2">Hủy</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        (function () {
+            var form = document.getElementById('photo-upload-form');
+            if (!form) return;
+            var fileInput = document.getElementById('files');
+            var submitBtn = form.querySelector('button[type="submit"]');
+            var errBox = document.getElementById('client-upload-errors');
+            var prog = document.getElementById('upload-progress');
+            var progHeadline = document.getElementById('upload-progress-headline');
+            var multiPreview = document.getElementById('upload-multi-preview');
+            var progBar = document.getElementById('upload-progress-bar');
+            var progTrack = document.getElementById('upload-progress-track');
+            var progDetail = document.getElementById('upload-progress-detail');
+            var maxPerBatch = @PhotosController.MaxFilesPerUploadRequest;
+            var indexUrl = form.getAttribute('data-index-url');
+
+            function setUploadBarPercent(frac) {
+                if (!progBar || !progTrack) return;
+                var p = Math.min(100, Math.max(0, Math.round(frac * 1000) / 10));
+                if (p > 0 && p < 3) p = 3;
+                progBar.style.width = p + '%';
+                progTrack.setAttribute('aria-valuenow', String(Math.round(p)));
+            }
+
+            function setUploadProgressUi(totalFiles, batchOneBased, numBatches, detailText, barFrac, animating) {
+                if (progHeadline) {
+                    if (numBatches > 1) {
+                        progHeadline.textContent = 'Tổng: ' + totalFiles + ' ảnh · Đợt ' + batchOneBased + ' / ' + numBatches;
+                    } else {
+                        progHeadline.textContent = 'Tổng: ' + totalFiles + ' ảnh · Một đợt gửi';
+                    }
+                }
+                if (progDetail) progDetail.textContent = detailText || '';
+                setUploadBarPercent(barFrac);
+                if (progBar) {
+                    if (animating) {
+                        progBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+                    } else {
+                        progBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                    }
+                }
+            }
+
+            function showErrors(lines) {
+                if (!errBox) return;
+                errBox.hidden = false;
+                errBox.innerHTML = lines.map(function (s) { return '<div>' + s + '</div>'; }).join('');
+            }
+
+            function clearErrors() {
+                if (!errBox) return;
+                errBox.hidden = true;
+                errBox.innerHTML = '';
+            }
+
+            function flashMessage(enq, skipped) {
+                if (enq <= 0) return 'Không có ảnh nào được nhận.';
+                if (skipped > 0) {
+                    return enq === 1
+                        ? ('Đã nhận 1 ảnh để xử lý. ' + skipped + ' file bị bỏ qua.')
+                        : ('Đã nhận ' + enq + ' ảnh để xử lý. ' + skipped + ' file bị bỏ qua.');
+                }
+                return enq === 1
+                    ? 'Đã thêm ảnh vào album (đang tải lên trong nền).'
+                    : ('Đã thêm ' + enq + ' ảnh vào album (đang tải lên trong nền).');
+            }
+
+            function refreshMultiPreview() {
+                if (!multiPreview || !fileInput) return;
+                var n = fileInput.files ? fileInput.files.length : 0;
+                if (n <= 0) {
+                    multiPreview.hidden = true;
+                    multiPreview.innerHTML = '';
+                    return;
+                }
+                if (n > maxPerBatch) {
+                    var nb = Math.ceil(n / maxPerBatch);
+                    var parts = [];
+                    for (var b = 0; b < nb; b++) {
+                        var s = b * maxPerBatch + 1;
+                        var e = Math.min((b + 1) * maxPerBatch, n);
+                        parts.push('Đợt ' + (b + 1) + ': ảnh ' + s + '–' + e);
+                    }
+                    multiPreview.innerHTML =
+                        '<span class="d-block fw-semibold text-body mb-1">Tổng: ' + n + ' ảnh · ' + nb + ' đợt (tối đa ' + maxPerBatch + ' ảnh/đợt)</span>' +
+                        '<span class="d-block text-secondary">' + parts.join(' · ') + '</span>';
+                } else {
+                    multiPreview.innerHTML = '<span class="text-secondary">Đã chọn <strong>' + n + '</strong> ảnh · <strong>một đợt</strong> gửi.</span>';
+                }
+                multiPreview.hidden = false;
+            }
+
+            fileInput.addEventListener('change', refreshMultiPreview);
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                clearErrors();
+                var files = fileInput.files;
+                if (!files || !files.length) return;
+
+                var tokenEl = form.querySelector('input[name="__RequestVerificationToken"]');
+                var tokenVal = tokenEl ? tokenEl.value : '';
+
+                var arr = Array.prototype.slice.call(files);
+                var chunks = [];
+                for (var i = 0; i < arr.length; i += maxPerBatch) {
+                    chunks.push(arr.slice(i, i + maxPerBatch));
+                }
+
+                var totalEnqueued = 0;
+                var totalSkipped = 0;
+                var fatalErrors = [];
+                var totalFiles = arr.length;
+                var numBatches = chunks.length;
+                var filesDoneBefore = 0;
+
+                if (submitBtn) submitBtn.disabled = true;
+                if (multiPreview) multiPreview.hidden = true;
+                if (prog) prog.hidden = false;
+
+                (async function () {
+                    try {
+                        for (var c = 0; c < chunks.length; c++) {
+                            var chunkLen = chunks[c].length;
+                            var rangeStart = filesDoneBefore + 1;
+                            var rangeEnd = filesDoneBefore + chunkLen;
+                            var batchOne = c + 1;
+                            var midFrac = (filesDoneBefore + chunkLen * 0.45) / totalFiles;
+                            var detailLine = 'Đang tải lên ảnh ' + rangeStart + '–' + rangeEnd + ' trong tổng ' + totalFiles + '…';
+                            setUploadProgressUi(totalFiles, batchOne, numBatches, detailLine, midFrac, true);
+                            var fd = new FormData();
+                            for (var j = 0; j < chunks[c].length; j++) {
+                                fd.append('files', chunks[c][j]);
+                            }
+                            fd.append('__RequestVerificationToken', tokenVal);
+
+                            var res = await fetch(form.action, {
+                                method: 'POST',
+                                body: fd,
+                                credentials: 'same-origin',
+                                headers: {
+                                    'X-Batch-Upload': '1',
+                                    'Accept': 'application/json'
+                                }
+                            });
+
+                            var rawText = await res.text();
+                            var data = null;
+                            try {
+                                if (rawText) data = JSON.parse(rawText);
+                            } catch (parseEx) { /* data giữ null */ }
+
+                            if (res.ok && data && data.ok === true) {
+                            totalEnqueued += data.enqueued || 0;
+                            totalSkipped += data.skipped || 0;
+                            filesDoneBefore += chunkLen;
+                            var afterFrac = filesDoneBefore / totalFiles;
+                            var doneDetail = 'Đã gửi ' + filesDoneBefore + '/' + totalFiles + ' ảnh lên máy chủ';
+                            if (numBatches > 1) {
+                                doneDetail += ' · xong đợt ' + batchOne + '/' + numBatches;
+                            }
+                            setUploadProgressUi(totalFiles, batchOne, numBatches, doneDetail, afterFrac, false);
+                            } else if (res.ok && (!data || data.ok !== true)) {
+                                if (data && data.ok === false) {
+                                    var errs = (data && data.errors) || [];
+                                    if (Array.isArray(errs) && errs.length) {
+                                        for (var k = 0; k < errs.length; k++) fatalErrors.push(errs[k]);
+                                    } else {
+                                        fatalErrors.push((data && data.message) || 'Gửi thất bại.');
+                                    }
+                                    break;
+                                }
+                                totalEnqueued += chunkLen;
+                                totalSkipped += 0;
+                                filesDoneBefore += chunkLen;
+                                var afterFrac2 = filesDoneBefore / totalFiles;
+                                var doneDetail2 = 'Đã gửi ' + filesDoneBefore + '/' + totalFiles + ' ảnh (ước lượng)';
+                                if (numBatches > 1) {
+                                    doneDetail2 += ' · xong đợt ' + batchOne + '/' + numBatches;
+                                }
+                                setUploadProgressUi(totalFiles, batchOne, numBatches, doneDetail2, afterFrac2, false);
+                                fatalErrors.push('Phản hồi từ máy chủ không đọc được JSON (đôi khi do proxy hoặc mạng). Đợt này vẫn có thể đã thành công — hãy mở album để kiểm tra.');
+                            } else {
+                                var errs2 = (data && data.errors) || [];
+                                if (Array.isArray(errs2) && errs2.length) {
+                                    for (var k2 = 0; k2 < errs2.length; k2++) fatalErrors.push(errs2[k2]);
+                                } else {
+                                    fatalErrors.push((data && data.message) || ('Gửi thất bại (' + res.status + ').'));
+                                }
+                                break;
+                            }
+                        }
+                    } catch (err) {
+                        fatalErrors.push('Lỗi mạng hoặc kết nối bị ngắt.');
+                    } finally {
+                        if (submitBtn) submitBtn.disabled = false;
+                        if (prog) prog.hidden = true;
+                        if (progBar) progBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+                    }
+
+                    if (fatalErrors.length && totalEnqueued === 0) {
+                        showErrors(fatalErrors);
+                        return;
+                    }
+
+                    var flash = flashMessage(totalEnqueued, totalSkipped);
+                    try {
+                        localStorage.setItem('photoUploadFlash', JSON.stringify({ message: flash }));
+                    } catch (e2) {}
+
+                    if (fatalErrors.length && totalEnqueued > 0) {
+                        showErrors(fatalErrors.concat(['Các ảnh đã gửi thành công trước đó vẫn được xử lý trong nền.']));
+                    }
+
+                    var note = document.getElementById('upload-done-note');
+                    if (!note) {
+                        note = document.createElement('div');
+                        note.id = 'upload-done-note';
+                        note.className = 'alert alert-success border-0 shadow-sm mt-3';
+                        note.setAttribute('role', 'alert');
+                        form.parentElement.insertBefore(note, form.nextSibling);
+                    }
+                    note.innerHTML = '';
+                    var doneLine = 'Đã gửi xong (' + totalEnqueued + ' ảnh)';
+                    if (totalSkipped > 0) {
+                        doneLine += totalSkipped === 1
+                            ? '; 1 file bị bỏ qua (không hợp lệ hoặc không đọc được như ảnh).'
+                            : ('; ' + totalSkipped + ' file bị bỏ qua (không hợp lệ hoặc không đọc được như ảnh).');
+                    }
+                    note.appendChild(document.createTextNode(doneLine + '. '));
+                    if (indexUrl) {
+                        var a = document.createElement('a');
+                        a.href = indexUrl;
+                        a.textContent = 'Xem album';
+                        note.appendChild(a);
+                        note.appendChild(document.createTextNode(' khi cần; bạn vẫn ở trang này và có thể chọn thêm ảnh bên dưới.'));
+                    } else {
+                        note.appendChild(document.createTextNode('Bạn có thể chọn thêm ảnh bên dưới.'));
+                    }
+                    try { fileInput.value = ''; } catch (e3) { /* một số trình duyệt chặn clear */ }
+                    refreshMultiPreview();
+                })();
+            });
+        })();
+    </script>
+}

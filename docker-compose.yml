@@ -1,0 +1,12 @@
+services:
+  dotnet:
+    container_name: storage-free
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: storage:latest
+    ports:
+      - "5011:5011"
+    volumes:
+      - ./App_Data:/app/App_Data
+    restart: unless-stopped

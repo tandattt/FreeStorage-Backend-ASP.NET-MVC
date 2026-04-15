@@ -1,0 +1,75 @@
+﻿<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Storage Free</title>
+    <link rel="icon" type="image/png" sizes="32x32" href="~/favicon-32x32.png" asp-append-version="true" />
+    <link rel="icon" type="image/png" href="~/favicon.png" asp-append-version="true" />
+    <link rel="apple-touch-icon" href="~/apple-touch-icon.png" asp-append-version="true" />
+    <script type="importmap"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/ImageUploadApp.styles.css" asp-append-version="true" />
+</head>
+<body class="d-flex flex-column min-vh-100 theme-editorial">
+    <header>
+        <nav class="navbar navbar-expand-md navbar-light navbar-editorial sticky-top">
+            <div class="container-fluid px-3 px-lg-4 main-shell editorial-shell">
+                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Storage Free</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav"
+                        aria-controls="mainNav" aria-expanded="false" aria-label="Mở menu">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="mainNav">
+                    <ul class="navbar-nav me-auto mb-2 mb-md-0 gap-md-1 align-items-md-center">
+                        <li class="nav-item">
+                            <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">Trang chủ</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" asp-area="" asp-controller="Pricing" asp-action="Index">Pricing</a>
+                        </li>
+                        @if (User.Identity?.IsAuthenticated == true)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-controller="Photos" asp-action="Index">Ảnh của tôi</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-controller="Photos" asp-action="Upload">Tải ảnh</a>
+                            </li>
+                        }
+                    </ul>
+                    <partial name="_LoginPartial" />
+                </div>
+            </div>
+        </nav>
+    </header>
+    <div class="container-fluid flex-grow-1 px-3 px-lg-4 py-4 py-md-5 main-shell editorial-shell mx-auto">
+        <main role="main">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="app-footer app-footer--editorial mt-auto py-5">
+        <div class="container-fluid px-3 px-lg-4 main-shell editorial-shell mx-auto">
+            <div class="row align-items-center gy-4">
+                <div class="col-md-6 text-center text-md-start">
+                    <div class="footer-brand mb-2">Storage Free</div>
+                    <p class="small text-secondary mb-0">Bảo quản kỹ thuật số an toàn cho khoảnh khắc quý giá của bạn.</p>
+                </div>
+                <div class="col-md-6 text-center text-md-end small text-secondary">
+                    <span>&copy; @DateTime.UtcNow.Year — Storage Free · Album cá nhân trong tài khoản của bạn.</span>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,14 @@
+**/.dockerignore
+**/.git
+**/.vs
+**/bin
+**/obj
+**/out
+**/*.db
+**/*.user
+**/*.suo
+**/node_modules
+**/TestResults
+**/appsettings.*.local.json
+**/.env
+**/.env.*

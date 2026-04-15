@@ -1,0 +1,42 @@
+﻿@{
+    ViewData["Title"] = "Trang chủ";
+}
+
+<section class="hero hero--editorial p-4 p-md-5 mb-4 mb-md-5">
+    <div class="hero-inner">
+        <div class="row align-items-center g-4 g-lg-5">
+            <div class="col-lg-7">
+                <span class="hero-badge">Riêng tư · Album cá nhân</span>
+                <h1 class="display-6 mb-3">Lưu ảnh của bạn, xem và tải về trong một nơi an toàn</h1>
+                <p class="lead mb-4">
+                    Đăng ký hoặc đăng nhập để có album riêng. Chỉ bạn mới xem được ảnh trong tài khoản — thuận tiện quản lý và tải về khi cần.
+                </p>
+                @if (User.Identity?.IsAuthenticated == true)
+                {
+                    <div class="d-flex flex-column flex-sm-row gap-2 gap-sm-3">
+                        <a class="btn btn-light btn-pill px-4" asp-controller="Photos" asp-action="Index">Ảnh của tôi</a>
+                        <a class="btn btn-outline-light btn-pill px-4" asp-controller="Photos" asp-action="Upload">Tải ảnh mới</a>
+                    </div>
+                }
+                else
+                {
+                    <div class="d-flex flex-column flex-sm-row gap-2 gap-sm-3">
+                        <a class="btn btn-light btn-pill px-4" asp-area="Identity" asp-page="/Account/Register">Đăng ký</a>
+                        <a class="btn btn-outline-light btn-pill px-4" asp-area="Identity" asp-page="/Account/Login">Đăng nhập</a>
+                    </div>
+                }
+            </div>
+            <div class="col-lg-5">
+                <div class="hero-panel rounded-4 p-4 p-md-4">
+                    <p class="small text-uppercase fw-semibold mb-3 opacity-75" style="letter-spacing: 0.08em;">Bạn nhận được</p>
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-3">Tài khoản riêng, chỉ bạn truy cập được album</li>
+                        <li class="mb-3">Ảnh được tối ưu để xem mượt trên mọi thiết bị</li>
+                        <li class="mb-3">Tải ảnh về máy bất cứ lúc nào</li>
+                        <li>Giao diện thân thiện cả trên điện thoại</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
