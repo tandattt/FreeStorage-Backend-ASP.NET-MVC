@@ -33,6 +33,11 @@ public class ImageRecord
 
     public DateTimeOffset CreatedAt { get; set; }
 
+    public Guid? FolderId { get; set; }
+
+    [ForeignKey(nameof(FolderId))]
+    public virtual PhotoFolder? Folder { get; set; }
+
     [ForeignKey(nameof(UserId))]
     public virtual Microsoft.AspNetCore.Identity.IdentityUser? User { get; set; }
 }
