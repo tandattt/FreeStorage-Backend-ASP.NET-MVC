@@ -1,32 +1,121 @@
 @model PhotosIndexVm
 @{
-    ViewData["Title"] = "Ảnh của bạn";
     var from = Model.TotalCount == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
     var to = Model.TotalCount == 0 ? 0 : Math.Min(Model.Page * Model.PageSize, Model.TotalCount);
     var compactGrid = Model.Cols >= 8;
+    var explorerHasItems = Model.ChildFolders.Count > 0 || Model.TotalCount > 0;
 }
 
 @if (TempData["Message"] is string msg)
 {
     <div class="alert alert-success border-0 shadow-sm mb-4" style="border-radius: var(--radius-editorial);" role="alert">@msg</div>
 }
+@if (TempData["Error"] is string err)
+{
+    <div class="alert alert-danger border-0 shadow-sm mb-4" style="border-radius: var(--radius-editorial);" role="alert">@err</div>
+}
 <div id="photo-upload-flash-host"></div>
+<div id="photo-af-store" class="d-none">@Html.AntiForgeryToken()</div>
 <div id="photo-sync-root" class="d-none" data-sync-url="@Url.Action("Sync", "Photos")" data-index-url="@Url.Action("Index", "Photos")"
-     data-revision="@Model.Revision" data-page="@Model.Page" data-page-size="@Model.PageSize" data-cols="@Model.Cols"></div>
+     data-revision="@Model.Revision" data-page="@Model.Page" data-page-size="@Model.PageSize" data-cols="@Model.Cols"
+     data-folder-id="@(Model.FolderId?.ToString() ?? "")" data-parent-folder-id="@(Model.ParentFolderId?.ToString() ?? "")"></div>
+<form id="photo-move-bulk-form" asp-action="MovePhotosBulk" method="post" class="d-none">
+    @Html.AntiForgeryToken()
+    <input type="hidden" name="imageIds" id="photo-bulk-image-ids" value="" />
+    <input type="hidden" name="targetFolderId" id="photo-bulk-target-folder" value="" />
+    <input type="hidden" name="returnFolderId" id="photo-bulk-return-folder" value="@(Model.FolderId?.ToString() ?? "")" />
+</form>
 
 <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-md-between gap-4 mb-4">
     <div>
         <h1 class="editorial-page-title mb-2">Ảnh đã tải lên</h1>
-        <p class="editorial-page-sub mb-0">Quản lý và xem album riêng tư của bạn — giao diện tối giản, tập trung vào ảnh.</p>
+        <p class="editorial-page-sub mb-0">
+            @if (Model.FolderId.HasValue && !string.IsNullOrEmpty(Model.FolderName))
+            {
+                <span>Thư mục: <strong>@Model.FolderName</strong> · </span>
+            }
+            Quản lý và xem album riêng tư của bạn — giao diện tối giản, tập trung vào ảnh.
+        </p>
     </div>
-    <a class="btn btn-primary d-inline-flex align-items-center gap-2 align-self-stretch align-self-md-auto px-4 py-2" asp-action="Upload">
-        <span class="material-symbols-outlined" style="font-size: 1.25rem;">upload</span>
-        Tải ảnh mới
-    </a>
+    @if (Model.FolderId.HasValue)
+    {
+        <a class="btn btn-primary d-inline-flex align-items-center gap-2 align-self-stretch align-self-md-auto px-4 py-2" asp-action="Upload" asp-route-folderId="@Model.FolderId">
+            <span class="material-symbols-outlined" style="font-size: 1.25rem;">upload</span>
+            Tải ảnh vào thư mục này
+        </a>
+    }
+    else
+    {
+        <a class="btn btn-primary d-inline-flex align-items-center gap-2 align-self-stretch align-self-md-auto px-4 py-2" asp-action="Upload">
+            <span class="material-symbols-outlined" style="font-size: 1.25rem;">upload</span>
+            Tải ảnh mới
+        </a>
+    }
 </div>
 
+<section class="mb-4">
+    <nav class="photo-breadcrumb mb-3" aria-label="Đường dẫn thư mục">
+        <a class="photo-breadcrumb__link" asp-action="Index">Album</a>
+        @foreach (var c in Model.Breadcrumb)
+        {
+            <span class="photo-breadcrumb__sep" aria-hidden="true">/</span>
+            @if (Model.FolderId == c.Id)
+            {
+                <span class="photo-breadcrumb__current">@c.Name</span>
+            }
+            else
+            {
+                <a class="photo-breadcrumb__link" asp-action="Index" asp-route-folderId="@c.Id">@c.Name</a>
+            }
+        }
+    </nav>
+    <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        @if (Model.FolderId.HasValue)
+        {
+            <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" asp-action="Index" asp-route-folderId="@Model.ParentFolderId" title="Thư mục cha">
+                <span class="material-symbols-outlined" style="font-size: 1.1rem;">arrow_upward</span>
+                Lên một cấp
+            </a>
+        }
+        <span class="text-secondary small ms-md-1">@Model.TotalLibraryCount ảnh trong toàn bộ album</span>
+    </div>
+    <div class="d-flex justify-content-end">
+        <div class="d-flex flex-column align-items-end gap-2 w-100 photo-folder-toolbar" style="max-width: 28rem;">
+            <div class="d-flex flex-wrap align-items-center justify-content-end gap-2 w-100">
+                <label class="visually-hidden" for="photo-folder-search">Tìm thư mục</label>
+                <input type="search" id="photo-folder-search" class="form-control form-control-sm" maxlength="200" placeholder="Tìm thư mục…" autocomplete="off" inputmode="search" style="min-width: 11rem; max-width: 16rem;" />
+                <button type="button" id="photo-toggle-create-folder" class="btn btn-sm btn-outline-secondary flex-shrink-0">Tạo thư mục</button>
+                @if (Model.FolderId.HasValue)
+                {
+                    <form asp-action="DeleteFolder" method="post" class="m-0 d-inline" onsubmit="return confirm('Xóa thư mục này? Tất cả ảnh trực tiếp trong thư mục sẽ bị xóa vĩnh viễn; thư mục con được đưa lên cấp trên.');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="folderId" value="@Model.FolderId" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Xóa thư mục này</button>
+                    </form>
+                }
+            </div>
+            <div id="photo-create-folder-box" class="photo-create-folder-panel surface-card border w-100 d-none" role="region" aria-labelledby="photo-create-folder-heading">
+                <form asp-action="CreateFolder" method="post" class="p-3 m-0">
+                    @Html.AntiForgeryToken()
+                    @if (Model.FolderId.HasValue)
+                    {
+                        <input type="hidden" name="parentFolderId" value="@Model.FolderId" />
+                    }
+                    <p class="small fw-semibold mb-2" id="photo-create-folder-heading">Thư mục mới</p>
+                    <label class="form-label small mb-1" for="new-folder-name">Tên thư mục</label>
+                    <input name="name" id="new-folder-name" class="form-control form-control-sm mb-3" maxlength="200" placeholder="Nhập tên thư mục" autocomplete="off" />
+                    <div class="d-flex flex-wrap gap-2 justify-content-end">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="photo-cancel-create-folder">Hủy</button>
+                        <button type="submit" class="btn btn-sm btn-primary">Tạo</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
 <section class="editorial-filters">
-    <div class="storage-quota storage-quota-inline @(Model.TotalCount > 0 ? "mb-3 mb-lg-4" : "mb-0")" role="region" aria-label="Dung lượng album">
+    <div class="storage-quota storage-quota-inline @(explorerHasItems ? "mb-3 mb-lg-4" : "mb-0")" role="region" aria-label="Dung lượng album">
         <div class="d-flex flex-wrap justify-content-between align-items-baseline gap-2 mb-2">
             <span class="editorial-label d-block mb-0">Dung lượng album</span>
             <span class="storage-quota-inline-value fw-semibold" style="color: var(--ed-primary);">
@@ -42,6 +131,10 @@
         <div id="photo-filters-row" class="d-flex flex-column flex-lg-row flex-wrap align-items-lg-end justify-content-lg-between gap-3 gap-lg-4">
             <form method="get" class="d-flex flex-wrap align-items-end gap-3 gap-md-4" id="photoGridPrefs">
                 <input type="hidden" name="page" value="1" />
+                @if (Model.FolderId.HasValue)
+                {
+                    <input type="hidden" name="folderId" value="@Model.FolderId" />
+                }
                 <input type="hidden" name="cols" id="colsVal" value="@Model.Cols" />
                 <div class="d-none d-md-block">
                     <label for="colsSel" class="editorial-label d-block">Số cột (màn hình lớn)</label>
@@ -82,20 +175,55 @@
 }
 </section>
 
-@if (Model.TotalCount == 0)
+@if (!explorerHasItems)
 {
     <div class="empty-state surface-card p-5 text-center">
-        <p class="text-secondary mb-4 mb-md-3">Chưa có ảnh nào.</p>
-        <a class="btn btn-primary px-4" asp-action="Upload">Tải ảnh đầu tiên</a>
+        <p class="text-secondary mb-4 mb-md-3">Chưa có thư mục con và chưa có ảnh ở cấp này.</p>
+        @if (Model.FolderId.HasValue)
+        {
+            <a class="btn btn-primary px-4" asp-action="Upload" asp-route-folderId="@Model.FolderId">Tải ảnh vào thư mục</a>
+        }
+        else
+        {
+            <a class="btn btn-primary px-4" asp-action="Upload">Tải ảnh đầu tiên</a>
+        }
     </div>
 }
 else
 {
+    @if (Model.TotalCount > 0)
+    {
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="photo-select-all-page">Chọn tất cả (trang này)</button>
+            <button type="button" class="btn btn-sm btn-link px-2" id="photo-clear-selection">Bỏ chọn</button>
+            <span class="small text-secondary" id="photo-selection-hint">Giữ Ctrl và bấm ảnh để chọn nhiều · kéo vào biểu tượng thư mục</span>
+        </div>
+    }
     <div class="photo-grid-responsive photo-grid-responsive--library" id="photo-grid" style="--photo-cols: @Model.Cols">
+        @foreach (var fo in Model.ChildFolders)
+        {
+            <a class="photo-folder-tile card editorial-card border-0 h-100 text-decoration-none"
+               asp-action="Index" asp-route-folderId="@fo.Id"
+               data-folder-drop-id="@fo.Id">
+                <div class="photo-folder-tile__body d-flex flex-column align-items-center justify-content-center p-4 text-center h-100">
+                    <span class="material-symbols-outlined photo-folder-tile__icon mb-2" aria-hidden="true">folder</span>
+                    <span class="photo-folder-tile__name fw-semibold text-break">@fo.Name</span>
+                    <span class="photo-folder-tile__meta small text-secondary mt-1">@fo.PhotoCount ảnh</span>
+                </div>
+            </a>
+        }
         @foreach (var item in Model.Items)
         {
-            <article class="card photo-card editorial-card border-0 h-100 @(compactGrid ? "photo-card-compact" : "")" data-photo-id="@item.Id" data-photo-created-at="@item.CreatedAt.ToString("o")" data-photo-pending="@(item.IsPending ? "true" : "false")" data-photo-failed="@(item.IsFailed ? "true" : "false")" data-photo-compact="@(compactGrid ? "true" : "false")">
+            <article class="card photo-card editorial-card border-0 h-100 @(compactGrid ? "photo-card-compact" : "")"
+                     data-photo-id="@item.Id" data-photo-created-at="@item.CreatedAt.ToString("o")" data-photo-pending="@(item.IsPending ? "true" : "false")" data-photo-failed="@(item.IsFailed ? "true" : "false")" data-photo-compact="@(compactGrid ? "true" : "false")"
+                     draggable="@(item.IsPending || item.IsFailed ? "false" : "true")">
                 <div class="photo-thumb editorial-thumb position-relative @(item.IsPending || item.IsFailed ? "" : "photo-thumb--zoom")">
+                    @if (!item.IsPending && !item.IsFailed)
+                    {
+                        <div class="photo-select-wrap position-absolute top-0 end-0 p-2" style="z-index: 4;">
+                            <input type="checkbox" class="form-check-input photo-select-cb shadow-sm" title="Chọn ảnh" />
+                        </div>
+                    }
                     @if (item.IsPending)
                     {
                         <div class="photo-placeholder d-flex flex-column align-items-center justify-content-center h-100 w-100">
@@ -155,6 +283,15 @@ else
                             }
                         </div>
                     }
+                    <form asp-action="DeleteImage" method="post" class="mt-2 mb-0" onsubmit="return confirm('Xóa ảnh này vĩnh viễn? Dung lượng album sẽ được trừ lại.');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="imageId" value="@item.Id" />
+                        @if (Model.FolderId.HasValue)
+                        {
+                            <input type="hidden" name="returnFolderId" value="@Model.FolderId" />
+                        }
+                        <button type="submit" class="btn btn-sm btn-link text-danger p-0 text-decoration-none">Xóa ảnh</button>
+                    </form>
                 </div>
             </article>
         }
@@ -192,6 +329,7 @@ else
                     <li class="page-item @(Model.Page <= 1 ? "disabled" : null)">
                         <a class="page-link"
                            asp-action="Index"
+                           asp-route-folderId="@Model.FolderId"
                            asp-route-page="@(Model.Page - 1)"
                            asp-route-pageSize="@Model.PageSize"
                            asp-route-cols="@Model.Cols"
@@ -206,6 +344,7 @@ else
                     <li class="page-item @(Model.Page >= Model.TotalPages ? "disabled" : null)">
                         <a class="page-link"
                            asp-action="Index"
+                           asp-route-folderId="@Model.FolderId"
                            asp-route-page="@(Model.Page + 1)"
                            asp-route-pageSize="@Model.PageSize"
                            asp-route-cols="@Model.Cols"
@@ -258,6 +397,40 @@ else
             });
         })();
     </script>
+    <script>
+        (function () {
+            var search = document.getElementById('photo-folder-search');
+            var toggler = document.getElementById('photo-toggle-create-folder');
+            var panel = document.getElementById('photo-create-folder-box');
+            var cancel = document.getElementById('photo-cancel-create-folder');
+            function applyFolderSearch() {
+                var grid = document.getElementById('photo-grid');
+                if (!grid) return;
+                var q = (search && search.value || '').trim().toLowerCase();
+                grid.querySelectorAll('.photo-folder-tile').forEach(function (tile) {
+                    var nm = tile.querySelector('.photo-folder-tile__name');
+                    var t = nm ? nm.textContent.replace(/\s+/g, ' ').trim().toLowerCase() : '';
+                    var show = !q || t.indexOf(q) !== -1;
+                    tile.classList.toggle('d-none', !show);
+                });
+            }
+            function closeCreatePanel() {
+                if (panel) panel.classList.add('d-none');
+            }
+            if (search) search.addEventListener('input', applyFolderSearch);
+            if (toggler && panel) {
+                toggler.addEventListener('click', function () {
+                    panel.classList.toggle('d-none');
+                    if (!panel.classList.contains('d-none')) {
+                        var inp = document.getElementById('new-folder-name');
+                        if (inp) { inp.focus(); try { inp.select(); } catch (e) { /* ignore */ } }
+                    }
+                });
+            }
+            if (cancel && panel) cancel.addEventListener('click', closeCreatePanel);
+            window.photoApplyFolderSearch = applyFolderSearch;
+        })();
+    </script>
     @if (Model.TotalCount > 0)
     {
         <script>
@@ -281,6 +454,8 @@ else
             })();
         </script>
     }
+    @if (explorerHasItems)
+    {
     <script>
         (function () {
             var root = document.getElementById('photo-sync-root');
@@ -321,7 +496,8 @@ else
             function buildPaginationNav(d) {
                 if (d.totalPages <= 1) return '';
                 var q = function (page) {
-                    return indexUrl + '?page=' + page + '&pageSize=' + encodeURIComponent(String(d.pageSize)) + '&cols=' + encodeURIComponent(String(d.cols));
+                    var fid = d.folderId != null && d.folderId !== '' ? ('&folderId=' + encodeURIComponent(String(d.folderId))) : '';
+                    return indexUrl + '?page=' + page + '&pageSize=' + encodeURIComponent(String(d.pageSize)) + '&cols=' + encodeURIComponent(String(d.cols)) + fid;
                 };
                 var prevDis = d.page <= 1 ? ' disabled' : '';
                 var nextDis = d.page >= d.totalPages ? ' disabled' : '';
@@ -336,7 +512,37 @@ else
                     '<span class="material-symbols-outlined" style="font-size: 1.25rem;">chevron_right</span></a></li></ul></nav>';
             }
 
-            function buildCardHtml(item, compactGrid) {
+            function getAfToken() {
+                var st = document.getElementById('photo-af-store');
+                if (!st) return '';
+                var inp = st.querySelector('input[name="__RequestVerificationToken"]');
+                return inp ? inp.value : '';
+            }
+
+            function buildDeleteFormHtml(idStr, viewFolderId) {
+                var tok = getAfToken();
+                if (!tok) return '';
+                var rf = (viewFolderId != null && viewFolderId !== '') ?
+                    '<input type="hidden" name="returnFolderId" value="' + escAttr(String(viewFolderId)) + '" />' : '';
+                return '<form action="/Photos/DeleteImage" method="post" class="mt-2 mb-0" onsubmit="return confirm(\'Xóa ảnh này vĩnh viễn? Dung lượng album sẽ được trừ lại.\');">' +
+                    '<input type="hidden" name="__RequestVerificationToken" value="' + escAttr(tok) + '" />' +
+                    '<input type="hidden" name="imageId" value="' + escAttr(idStr) + '" />' + rf +
+                    '<button type="submit" class="btn btn-sm btn-link text-danger p-0 text-decoration-none">Xóa ảnh</button></form>';
+            }
+
+            function buildFolderTileHtml(f) {
+                var id = String(f.id != null ? f.id : f.Id);
+                var name = String(f.name != null ? f.name : f.Name);
+                var cnt = f.photoCount != null ? f.photoCount : (f.PhotoCount != null ? f.PhotoCount : 0);
+                var href = indexUrl + (indexUrl.indexOf('?') >= 0 ? '&' : '?') + 'folderId=' + encodeURIComponent(id);
+                return '<a class="photo-folder-tile card editorial-card border-0 h-100 text-decoration-none" href="' + escAttr(href) + '" data-folder-drop-id="' + escAttr(id) + '">' +
+                    '<div class="photo-folder-tile__body d-flex flex-column align-items-center justify-content-center p-4 text-center h-100">' +
+                    '<span class="material-symbols-outlined photo-folder-tile__icon mb-2" aria-hidden="true">folder</span>' +
+                    '<span class="photo-folder-tile__name fw-semibold text-break">' + escAttr(name) + '</span>' +
+                    '<span class="photo-folder-tile__meta small text-secondary mt-1">' + escAttr(String(cnt)) + ' ảnh</span></div></a>';
+            }
+
+            function buildCardHtml(item, compactGrid, viewFolderId) {
                 var idStr = String(item.id != null ? item.id : item.Id);
                 var compact = compactGrid ? ' photo-card-compact' : '';
                 var thumbClass = 'photo-thumb editorial-thumb position-relative';
@@ -355,7 +561,9 @@ else
                 } else {
                     var pu = escAttr(item.proxyUrl || '');
                     var du = escAttr(item.downloadUrl || item.proxyUrl || '');
-                    thumbInner = '<div class="position-relative w-100 h-100 photo-thumb-inner">' +
+                    var selBox = '<div class="photo-select-wrap position-absolute top-0 end-0 p-2" style="z-index: 4;">' +
+                        '<input type="checkbox" class="form-check-input photo-select-cb shadow-sm" title="Chọn ảnh" /></div>';
+                    thumbInner = selBox + '<div class="position-relative w-100 h-100 photo-thumb-inner">' +
                         '<img src="' + pu + '" alt="Ảnh đã tải" loading="lazy" decoding="async" class="photo-img" />' +
                         '<button type="button" class="photo-zoom-open btn position-absolute top-0 start-0 w-100 h-100 p-0 border-0 bg-transparent" data-bs-toggle="modal" data-bs-target="#photoLightbox" data-img="' + pu + '" data-download="' + du + '" aria-label="Xem ảnh phóng to"></button></div>';
                 }
@@ -377,11 +585,115 @@ else
                 var mb = compactGrid ? ' mb-0' : '';
                 var pb = compactGrid ? ' pb-2 pt-3' : '';
                 var createdIso = item.createdAt != null ? String(item.createdAt) : '';
-                return '<article class="card photo-card editorial-card border-0 h-100' + compact + '" data-photo-id="' + escAttr(idStr) + '" data-photo-created-at="' + escAttr(createdIso) + '" data-photo-pending="' + (item.isPending ? 'true' : 'false') + '" data-photo-failed="' + (item.isFailed ? 'true' : 'false') + '" data-photo-compact="' + (compactGrid ? 'true' : 'false') + '">' +
+                var drag = (item.isPending || item.isFailed) ? 'false' : 'true';
+                var delForm = buildDeleteFormHtml(idStr, viewFolderId);
+                return '<article class="card photo-card editorial-card border-0 h-100' + compact + '" draggable="' + drag + '" data-photo-id="' + escAttr(idStr) + '" data-photo-created-at="' + escAttr(createdIso) + '" data-photo-pending="' + (item.isPending ? 'true' : 'false') + '" data-photo-failed="' + (item.isFailed ? 'true' : 'false') + '" data-photo-compact="' + (compactGrid ? 'true' : 'false') + '">' +
                     '<div class="' + thumbClass + zoomOrNot + '">' + thumbInner + '</div>' +
                     '<div class="card-body photo-card__details d-none d-md-flex flex-column p-4' + pb + '">' +
                     '<div class="mb-3' + mb + '"><p class="photo-meta-label">Đã tải lên</p><p class="small mb-0 photo-date" style="color: var(--ed-on-surface);">' + escAttr(dateLabel) + '</p></div>' +
-                    (!compactGrid ? dlPart : '') + '</div></article>';
+                    (!compactGrid ? dlPart : '') + delForm + '</div></article>';
+            }
+
+            function ensurePhotoExplorerDelegate() {
+                var grid = document.getElementById('photo-grid');
+                if (!grid || grid._deleg) return;
+                grid._deleg = true;
+                var bulkForm = document.getElementById('photo-move-bulk-form');
+                var r = document.getElementById('photo-sync-root');
+                var lastDropTile = null;
+                grid.addEventListener('change', function (e) {
+                    var t = e.target;
+                    if (!t || !t.classList || !t.classList.contains('photo-select-cb')) return;
+                    var card = t.closest('.photo-card');
+                    if (card) card.classList.toggle('photo-card--selected', t.checked);
+                });
+                grid.addEventListener('click', function (e) {
+                    var card = e.target.closest('.photo-card');
+                    if (!card || !grid.contains(card)) return;
+                    if (e.target.closest('.photo-zoom-open') || e.target.closest('a') || e.target.closest('select') || e.target.closest('button')) return;
+                    if (e.target.closest('input') && e.target.classList.contains('photo-select-cb')) return;
+                    if (!e.ctrlKey && !e.metaKey) return;
+                    e.preventDefault();
+                    var cbx = card.querySelector('.photo-select-cb');
+                    if (!cbx) return;
+                    cbx.checked = !cbx.checked;
+                    card.classList.toggle('photo-card--selected', cbx.checked);
+                });
+                grid.addEventListener('dragstart', function (e) {
+                    var card = e.target.closest('.photo-card');
+                    if (!card || !grid.contains(card)) return;
+                    var id = card.getAttribute('data-photo-id');
+                    var ids = [];
+                    if (card.classList.contains('photo-card--selected')) {
+                        grid.querySelectorAll('.photo-card--selected').forEach(function (c) {
+                            var pid = c.getAttribute('data-photo-id');
+                            if (pid) ids.push(pid);
+                        });
+                    } else if (id) ids = [id];
+                    e.dataTransfer.setData('text/plain', ids.join(','));
+                    e.dataTransfer.effectAllowed = 'move';
+                }, true);
+                grid.addEventListener('dragover', function (e) {
+                    var tile = e.target.closest('.photo-folder-tile');
+                    if (!tile || !grid.contains(tile)) {
+                        if (lastDropTile) {
+                            lastDropTile.classList.remove('photo-folder-tile--drop');
+                            lastDropTile = null;
+                        }
+                        return;
+                    }
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                    if (lastDropTile && lastDropTile !== tile) lastDropTile.classList.remove('photo-folder-tile--drop');
+                    lastDropTile = tile;
+                    tile.classList.add('photo-folder-tile--drop');
+                });
+                grid.addEventListener('dragleave', function (e) {
+                    var tile = e.target.closest('.photo-folder-tile');
+                    if (!tile || tile.contains(e.relatedTarget)) return;
+                    tile.classList.remove('photo-folder-tile--drop');
+                    if (lastDropTile === tile) lastDropTile = null;
+                });
+                grid.addEventListener('drop', function (e) {
+                    var tile = e.target.closest('.photo-folder-tile');
+                    if (!tile || !grid.contains(tile)) return;
+                    e.preventDefault();
+                    tile.classList.remove('photo-folder-tile--drop');
+                    if (lastDropTile === tile) lastDropTile = null;
+                    var raw = e.dataTransfer.getData('text/plain') || '';
+                    var fid = tile.getAttribute('data-folder-drop-id');
+                    if (!raw || !fid || !bulkForm) return;
+                    var idsEl = document.getElementById('photo-bulk-image-ids');
+                    var tgtEl = document.getElementById('photo-bulk-target-folder');
+                    var retEl = document.getElementById('photo-bulk-return-folder');
+                    if (idsEl) idsEl.value = raw;
+                    if (tgtEl) tgtEl.value = fid;
+                    if (retEl && r) retEl.value = r.getAttribute('data-folder-id') || '';
+                    bulkForm.submit();
+                });
+            }
+
+            var allBtn = document.getElementById('photo-select-all-page');
+            if (allBtn && !allBtn._photoBound) {
+                allBtn._photoBound = true;
+                allBtn.addEventListener('click', function () {
+                    document.querySelectorAll('#photo-grid .photo-select-cb').forEach(function (cb) {
+                        cb.checked = true;
+                        var card = cb.closest('.photo-card');
+                        if (card) card.classList.add('photo-card--selected');
+                    });
+                });
+            }
+            var clearBtn = document.getElementById('photo-clear-selection');
+            if (clearBtn && !clearBtn._photoBound) {
+                clearBtn._photoBound = true;
+                clearBtn.addEventListener('click', function () {
+                    document.querySelectorAll('#photo-grid .photo-select-cb').forEach(function (cb) {
+                        cb.checked = false;
+                        var card = cb.closest('.photo-card');
+                        if (card) card.classList.remove('photo-card--selected');
+                    });
+                });
             }
 
             async function poll() {
@@ -389,7 +701,9 @@ else
                 var page = root.getAttribute('data-page') || '1';
                 var pageSize = root.getAttribute('data-page-size') || '12';
                 var cols = root.getAttribute('data-cols') || '6';
-                var url = syncUrl + '?page=' + encodeURIComponent(page) + '&pageSize=' + encodeURIComponent(pageSize) + '&cols=' + encodeURIComponent(cols) + '&revision=' + encodeURIComponent(revision);
+                var folderAttr = root.getAttribute('data-folder-id') || '';
+                var folderQ = folderAttr !== '' ? ('&folderId=' + encodeURIComponent(folderAttr)) : '';
+                var url = syncUrl + '?page=' + encodeURIComponent(page) + '&pageSize=' + encodeURIComponent(pageSize) + '&cols=' + encodeURIComponent(cols) + folderQ + '&revision=' + encodeURIComponent(revision);
                 try {
                     var res = await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
                     if (!res.ok) return;
@@ -400,8 +714,9 @@ else
                     }
 
                     var hadGrid = !!document.getElementById('photo-grid');
-                    var hasItems = (data.totalCount || 0) > 0;
-                    if (hadGrid !== hasItems) {
+                    var cfs = data.childFolders || [];
+                    var hasExplorer = (cfs.length > 0) || (data.totalCount || 0) > 0;
+                    if (hadGrid !== hasExplorer) {
                         window.location.reload();
                         return;
                     }
@@ -427,8 +742,12 @@ else
                         grid.style.setProperty('--photo-cols', String(data.cols));
                         var items = data.items || [];
                         var cg = !!data.compactGrid;
-                        grid.innerHTML = items.map(function (it) { return buildCardHtml(it, cg); }).join('');
+                        var folderHtml = (data.childFolders || []).map(buildFolderTileHtml).join('');
+                        var vf = data.folderId != null && data.folderId !== undefined && data.folderId !== '' ? String(data.folderId) : '';
+                        var photoHtml = items.map(function (it) { return buildCardHtml(it, cg, vf); }).join('');
+                        grid.innerHTML = folderHtml + photoHtml;
                         updatePendingSlowNotes();
+                        if (typeof window.photoApplyFolderSearch === 'function') window.photoApplyFolderSearch();
                     }
 
                     var wrap = document.getElementById('photo-pagination-wrap');
@@ -446,12 +765,26 @@ else
                     root.setAttribute('data-page', String(data.page));
                     root.setAttribute('data-page-size', String(data.pageSize));
                     root.setAttribute('data-cols', String(data.cols));
+                    if (data.folderId != null && data.folderId !== undefined && data.folderId !== '') {
+                        root.setAttribute('data-folder-id', String(data.folderId));
+                    } else {
+                        root.setAttribute('data-folder-id', '');
+                    }
+                    if (data.parentFolderId != null && data.parentFolderId !== undefined && data.parentFolderId !== '') {
+                        root.setAttribute('data-parent-folder-id', String(data.parentFolderId));
+                    } else {
+                        root.setAttribute('data-parent-folder-id', '');
+                    }
+                    var retEl = document.getElementById('photo-bulk-return-folder');
+                    if (retEl) retEl.value = root.getAttribute('data-folder-id') || '';
                 } catch (_) { /* giữ interval */ }
             }
 
             setInterval(poll, pollMs);
             updatePendingSlowNotes();
             setInterval(updatePendingSlowNotes, 30000);
+            ensurePhotoExplorerDelegate();
         })();
     </script>
+    }
 }

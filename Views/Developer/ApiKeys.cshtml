@@ -1,0 +1,102 @@
+@model IReadOnlyList<ImageUploadApp.Services.UserApiKeyListItem>
+@{
+    ViewData["Title"] = "Khóa API";
+}
+<div class="dev-portal-page">
+    <div class="row g-4 align-items-start">
+        <aside class="col-lg-4 col-12">
+            @await Html.PartialAsync("_DeveloperPortalNav")
+        </aside>
+        <div class="col-lg-8 col-12">
+            <h1 class="h4 mb-2">API keys</h1>
+            <p class="text-secondary small mb-4">
+                Khóa bí mật chỉ hiển thị <strong>một lần</strong> khi tạo. Không chia sẻ công khai.
+                Dùng header <code>X-Api-Key</code> với giá trị đầy đủ <code>clientId.secret</code>.
+            </p>
+
+            @if (TempData["ApiKeyError"] is string err)
+            {
+                <div class="alert alert-danger py-2 small">@err</div>
+            }
+            @if (TempData["ApiKeyInfo"] is string info)
+            {
+                <div class="alert alert-success py-2 small">@info</div>
+            }
+            @if (TempData["NewApiKey"] is string nk)
+            {
+                <div class="alert alert-warning py-3">
+                    <div class="fw-semibold mb-1">Khóa mới (sao chép ngay)</div>
+                    <pre class="bg-white border rounded p-2 small mb-2 overflow-auto user-select-all">@nk</pre>
+                    <span class="small text-secondary">Không hiển thị lại sau khi rời trang.</span>
+                </div>
+            }
+
+            <div class="card border-0 shadow-sm mb-3">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Tên</th>
+                                <th>Trạng thái</th>
+                                <th>Client ID</th>
+                                <th>Tạo lúc (UTC)</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.Count == 0)
+                            {
+                                <tr>
+                                    <td colspan="5" class="text-center text-secondary py-5">No Data</td>
+                                </tr>
+                            }
+                            else
+                            {
+                                foreach (var row in Model)
+                                {
+                                    <tr>
+                                        <td class="fw-medium">@row.Name</td>
+                                        <td>
+                                            @if (row.IsActive)
+                                            {
+                                                <span class="badge text-bg-success">Active</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge text-bg-secondary">Revoked</span>
+                                            }
+                                        </td>
+                                        <td><code class="small">@row.ClientId</code></td>
+                                        <td>@row.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td class="text-end">
+                                            @if (row.IsActive)
+                                            {
+                                                <form asp-controller="Developer" asp-action="RevokeApiKey" method="post" class="d-inline" onsubmit="return confirm('Thu hồi khóa này?');">
+                                                    @Html.AntiForgeryToken()
+                                                    <input type="hidden" name="id" value="@row.Id" />
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Thu hồi</button>
+                                                </form>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <form asp-controller="Developer" asp-action="CreateApiKey" method="post" class="card border-0 shadow-sm p-3">
+                @Html.AntiForgeryToken()
+                <label class="form-label small fw-semibold">Tạo khóa mới</label>
+                <div class="input-group input-group-sm">
+                    <input name="name" class="form-control" maxlength="120" placeholder="VD: Production-Web-App" required />
+                    <button type="submit" class="btn btn-primary">
+                        <span class="material-symbols-outlined align-middle" style="font-size:1.1rem;">add</span>
+                        Create a New Secret Key
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

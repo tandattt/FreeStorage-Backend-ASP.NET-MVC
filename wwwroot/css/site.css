@@ -723,6 +723,79 @@ body.theme-editorial .ratio.photo-thumb:not(.editorial-thumb) {
   }
 }
 
+/* Explorer — thư mục lồng + chọn / kéo ảnh */
+.photo-breadcrumb {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.photo-breadcrumb__link {
+  color: var(--ed-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.photo-breadcrumb__link:hover {
+  text-decoration: underline;
+}
+
+.photo-breadcrumb__sep {
+  margin: 0 0.35rem;
+  color: var(--ed-outline);
+}
+
+.photo-breadcrumb__current {
+  font-weight: 700;
+  color: var(--ed-on-surface);
+}
+
+.photo-create-folder-panel {
+  border-radius: var(--radius-editorial);
+  border-color: var(--ed-outline-variant) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.photo-folder-tile {
+  border-radius: var(--radius-editorial);
+  box-shadow: var(--ed-card-shadow, 0 1px 3px rgba(0, 0, 0, 0.06));
+  transition: box-shadow 0.2s ease, transform 0.15s ease, outline 0.15s ease;
+  color: inherit;
+  min-height: 9rem;
+}
+
+.photo-folder-tile:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.photo-folder-tile--drop {
+  outline: 3px solid var(--ed-primary);
+  outline-offset: 2px;
+  background: var(--ed-surface-container-low);
+}
+
+.photo-folder-tile__icon {
+  font-size: 3rem !important;
+  color: var(--ed-primary);
+  opacity: 0.9;
+}
+
+.photo-folder-tile__name {
+  color: var(--ed-on-surface);
+}
+
+#photo-grid .photo-card--selected {
+  outline: 3px solid var(--ed-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-editorial);
+}
+
+#photo-grid .photo-select-wrap .form-check-input {
+  cursor: pointer;
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
 /* Lightbox ảnh — nền mờ đục nhẹ + blur để ảnh đang xem nổi bật */
 .photo-lightbox.modal {
   --bs-modal-bg: transparent;
@@ -1027,4 +1100,77 @@ body:has(#photoLightbox.show) .modal-backdrop {
 
 .app-footer.app-footer--editorial a:hover {
   color: var(--ed-primary);
+}
+
+/* Developer portal — API docs & keys */
+.dev-portal-page .dev-doc-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9rem;
+  color: #d63384;
+  word-break: break-all;
+}
+
+.dev-code-block {
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  overflow: auto;
+  margin-bottom: 0;
+}
+
+.dev-code-block code {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #212529;
+}
+
+.dev-meth {
+  font-weight: 600;
+  font-size: 0.7rem;
+  letter-spacing: 0.02em;
+  border-radius: 0.35rem;
+  padding: 0.2rem 0.45rem;
+}
+
+.dev-meth-get {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.dev-meth-post {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.dev-meth-del {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.dev-docs-sidebar {
+  position: sticky;
+  top: 4.5rem;
+}
+
+.dev-api-list .list-group-item {
+  border: 0;
+  border-radius: 0.35rem !important;
+  padding: 0.45rem 0.5rem;
+  margin-bottom: 0.15rem;
+}
+
+.dev-api-list .list-group-item:hover {
+  background: #eff6ff;
+}
+
+.dev-api-tip {
+  font-size: 0.78rem;
+}
+
+@media (max-width: 991.98px) {
+  .dev-docs-sidebar {
+    position: static;
+  }
 }

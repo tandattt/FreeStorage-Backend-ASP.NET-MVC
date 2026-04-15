@@ -1,0 +1,132 @@
+@{
+    ViewData["Title"] = "Tài liệu API";
+    var publicBase = (ViewData["PublicBaseUrl"] as string ?? $"{Context.Request.Scheme}://{Context.Request.Host}{Context.Request.PathBase}").TrimEnd('/');
+    var apiRoot = $"{publicBase}/api/v1/album";
+    var keysUrl = Url.RouteUrl("developerApiKeys");
+}
+<div class="dev-portal-page">
+    <div class="row g-4 align-items-start">
+        <aside class="col-lg-4 col-12 dev-docs-sidebar">
+            @await Html.PartialAsync("_DeveloperPortalNav")
+            @await Html.PartialAsync("_DeveloperApiList")
+        </aside>
+        <div class="col-lg-8 col-12 dev-docs-main">
+            <h1 class="h4 mb-2">API Album cho developer</h1>
+            <p class="text-secondary small mb-4">
+                Tạo khóa tại <a href="@keysUrl">Khóa API</a>. Mọi request REST dùng header
+                <code>X-Api-Key: &lt;clientId&gt;.&lt;secret&gt;</code> (hỗ trợ thêm <code>apikey</code>).
+                Trình duyệt khi đăng nhập vẫn dùng cookie JWT như cũ.
+            </p>
+
+            <section class="dev-doc-section mb-5" id="ep-auth">
+                <h2 class="h6 mb-2">1. Xác thực</h2>
+                <p class="small text-secondary mb-2">Headers mẫu:</p>
+                <pre class="dev-code-block"><code>{
+  "Content-Type": "application/json",
+  "X-Api-Key": "YOUR_FULL_KEY"
+}</code></pre>
+            </section>
+
+            <section class="dev-doc-section mb-5" id="ep-storage">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge dev-meth dev-meth-get">GET</span>
+                    <span class="dev-doc-path">@apiRoot/storage</span>
+                </div>
+                <p class="small text-secondary mb-2">Dung lượng: <code>usedBytes</code>, <code>quotaBytes</code>, <code>usedPercent</code>, <code>totalImages</code>.</p>
+                <pre class="dev-code-block"><code>curl "@apiRoot/storage" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
+            </section>
+
+            <section class="dev-doc-section mb-5" id="ep-folders">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge dev-meth dev-meth-get">GET</span>
+                    <span class="dev-doc-path">@apiRoot/folders?parentFolderId=&amp;page=1&amp;pageSize=50</span>
+                </div>
+                <ul class="small text-secondary mb-2">
+                    <li>Không gửi <code>parentFolderId</code> → thư mục gốc.</li>
+                    <li>Mỗi phần tử: <code>id</code>, <code>name</code>, <code>photoCount</code>, <code>parentFolderId</code>.</li>
+                </ul>
+                <pre class="dev-code-block"><code>curl "@apiRoot/folders?page=1&amp;pageSize=20" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
+            </section>
+
+            <section class="dev-doc-section mb-5" id="ep-photos">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge dev-meth dev-meth-get">GET</span>
+                    <span class="dev-doc-path">@apiRoot/photos?folderId=&amp;page=1&amp;pageSize=24</span>
+                </div>
+                <ul class="small text-secondary mb-2">
+                    <li>Không có <code>folderId</code> → ảnh chưa gán thư mục.</li>
+                    <li>Có <code>folderId</code> → ảnh trong thư mục; <code>mediaUrl</code> khi đã xử lý.</li>
+                </ul>
+                <pre class="dev-code-block"><code>curl "@apiRoot/photos?page=1&amp;pageSize=12" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
+            </section>
+
+            <section class="dev-doc-section mb-5" id="ep-folder-create">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge dev-meth dev-meth-post">POST</span>
+                    <span class="dev-doc-path">@apiRoot/folders</span>
+                </div>
+                <p class="small text-secondary mb-2">JSON: <code>name</code>, <code>parentFolderId</code> (tuỳ chọn).</p>
+                <pre class="dev-code-block"><code>curl -X POST "@apiRoot/folders" ^
+  -H "X-Api-Key: YOUR_FULL_KEY" -H "Content-Type: application/json" ^
+  -d "{\"name\":\"Thư mục A\",\"parentFolderId\":null}"</code></pre>
+            </section>
+
+            <section class="dev-doc-section mb-5" id="ep-folder-delete">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge dev-meth dev-meth-del">DELETE</span>
+                    <span class="dev-doc-path">@apiRoot/folders/{id}</span>
+                </div>
+                <p class="small text-secondary mb-2">Xóa ảnh trực tiếp trong thư mục; thư mục con được đưa lên cấp trên.</p>
+                <pre class="dev-code-block"><code>curl -X DELETE "@apiRoot/folders/FOLDER-GUID" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
+            </section>
+
+            <section class="dev-doc-section mb-5" id="ep-upload">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge dev-meth dev-meth-post">POST</span>
+                    <span class="dev-doc-path">@apiRoot/photos/upload</span>
+                </div>
+                <p class="small text-secondary mb-2"><code>multipart/form-data</code>: <code>files</code> (một hoặc nhiều), tuỳ chọn <code>folderId</code>.</p>
+                <pre class="dev-code-block"><code>curl -X POST "@apiRoot/photos/upload" ^
+  -H "X-Api-Key: YOUR_FULL_KEY" ^
+  -F "files=@@C:\path\photo.jpg" ^
+  -F "folderId="</code></pre>
+                <p class="small text-secondary mb-0">Tối đa @ImageUploadApp.Services.PhotoBatchUploadService.MaxFilesPerRequest ảnh mỗi lần.</p>
+            </section>
+
+            <section class="dev-doc-section mb-5" id="ep-photo-delete">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge dev-meth dev-meth-del">DELETE</span>
+                    <span class="dev-doc-path">@apiRoot/photos/{id}</span>
+                </div>
+                <pre class="dev-code-block"><code>curl -X DELETE "@apiRoot/photos/IMAGE-GUID" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
+            </section>
+
+            <section class="dev-doc-section mb-4" id="ep-media">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge dev-meth dev-meth-get">GET</span>
+                    <span class="dev-doc-path">@publicBase/media/{id}</span>
+                </div>
+                <p class="small text-secondary mb-0">
+                    Trả bytes ảnh đã xử lý. Gửi cùng <code>X-Api-Key</code> như API (hoặc session đăng nhập).
+                </p>
+            </section>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        (function () {
+            var input = document.querySelector('.dev-api-search');
+            var items = document.querySelectorAll('.dev-api-item');
+            if (!input || !items.length) return;
+            input.addEventListener('input', function () {
+                var q = (input.value || '').trim().toLowerCase();
+                items.forEach(function (a) {
+                    var t = (a.getAttribute('data-text') || a.textContent || '').toLowerCase();
+                    a.classList.toggle('d-none', q.length > 0 && t.indexOf(q) === -1);
+                });
+            });
+        })();
+    </script>
+}

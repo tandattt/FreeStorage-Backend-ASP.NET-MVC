@@ -1,10 +1,10 @@
-@{
-    ViewData["Title"] = "Tải ảnh";
-}
-
 <div class="mx-auto" style="max-width: 560px;">
     <div class="mb-4">
         <h1 class="editorial-page-title mb-2">Tải ảnh</h1>
+        @if (ViewData["UploadFolderName"] is string fn && !string.IsNullOrEmpty(fn))
+        {
+            <p class="small fw-semibold mb-2" style="color: var(--ed-primary);">Thư mục đích: @fn</p>
+        }
         <p class="editorial-page-sub mb-0">
             Chọn một hoặc nhiều ảnh từ thiết bị (giữ Ctrl/Cmd khi chọn để chọn nhiều file). Sau khi gửi, ảnh sẽ xuất hiện trong album. Nếu ảnh lên chậm hoặc chưa thấy ngay (đặc biệt khi gửi số lượng lớn), hãy đợi thêm khoảng 5–10 phút rồi tải lại trang album.
         </p>
@@ -12,8 +12,12 @@
 
     <div class="surface-card p-4 p-md-5">
         <form id="photo-upload-form" asp-action="Upload" method="post" enctype="multipart/form-data" class="d-grid gap-4"
-              data-index-url="@Url.Action("Index")">
+              data-index-url="@(ViewData["UploadFolderId"] is Guid uidx ? Url.Action("Index", "Photos", new { folderId = uidx }) : Url.Action("Index", "Photos"))">
             @Html.AntiForgeryToken()
+            @if (ViewData["UploadFolderId"] is Guid hid)
+            {
+                <input type="hidden" name="folderId" value="@hid" />
+            }
             <div>
                 <label for="files" class="form-label fw-semibold">Chọn ảnh</label>
                 <div class="upload-zone">
@@ -33,7 +37,14 @@
             </div>
             <div class="d-flex flex-column flex-sm-row gap-2">
                 <button type="submit" class="btn btn-primary btn-pill flex-grow-1 py-2">Gửi ảnh</button>
-                <a asp-action="Index" class="btn btn-outline-secondary btn-pill flex-grow-1 py-2">Hủy</a>
+                @if (ViewData["UploadFolderId"] is Guid cancelF)
+                {
+                    <a asp-action="Index" asp-route-folderId="@cancelF" class="btn btn-outline-secondary btn-pill flex-grow-1 py-2">Hủy</a>
+                }
+                else
+                {
+                    <a asp-action="Index" class="btn btn-outline-secondary btn-pill flex-grow-1 py-2">Hủy</a>
+                }
             </div>
         </form>
     </div>
@@ -176,6 +187,10 @@
                                 fd.append('files', chunks[c][j]);
                             }
                             fd.append('__RequestVerificationToken', tokenVal);
+                            var folderInp = form.querySelector('input[name="folderId"]');
+                            if (folderInp && folderInp.value) {
+                                fd.append('folderId', folderInp.value);
+                            }
 
                             var res = await fetch(form.action, {
                                 method: 'POST',

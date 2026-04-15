@@ -1,0 +1,14 @@
+@{
+    var active = ViewData["DeveloperNav"] as string ?? "docs";
+    var docsUrl = Url.RouteUrl("developerAlbumApi");
+    var keysUrl = Url.RouteUrl("developerApiKeys");
+}
+<div class="dev-portal-nav card border-0 shadow-sm mb-3">
+    <div class="card-body p-3">
+        <div class="fw-semibold mb-2 small text-uppercase text-secondary">Developer</div>
+        <div class="d-grid gap-2">
+            <a href="@docsUrl" class="btn btn-sm @(active == "docs" ? "btn-primary" : "btn-outline-primary")">Tài liệu API</a>
+            <a href="@keysUrl" class="btn btn-sm @(active == "keys" ? "btn-primary" : "btn-outline-primary")">Khóa API</a>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,21 @@
+<div class="dev-api-list card border-0 shadow-sm mb-3">
+    <div class="card-body p-3">
+        <div class="fw-semibold mb-2 small">Api List</div>
+        <div class="alert alert-info py-2 px-2 small mb-2 dev-api-tip">
+            Gửi header <code>X-Api-Key</code> (hoặc <code>apikey</code>) với giá trị <code>clientId.secret</code> sau khi tạo khóa.
+        </div>
+        <label class="form-label small text-secondary mb-1">Tìm endpoint</label>
+        <input type="search" class="form-control form-control-sm mb-2 dev-api-search" placeholder="Tên, method…" autocomplete="off" />
+        <div class="list-group list-group-flush dev-api-endpoints small">
+            <a class="list-group-item list-group-item-action dev-api-item" href="#ep-auth" data-text="giới thiệu auth header">Giới thiệu</a>
+            <a class="list-group-item list-group-item-action dev-api-item" href="#ep-storage" data-text="storage dung lượng GET"><span class="badge dev-meth dev-meth-get">GET</span> Dung lượng</a>
+            <a class="list-group-item list-group-item-action dev-api-item" href="#ep-folders" data-text="folders danh sách GET"><span class="badge dev-meth dev-meth-get">GET</span> Danh sách thư mục</a>
+            <a class="list-group-item list-group-item-action dev-api-item" href="#ep-photos" data-text="photos ảnh GET"><span class="badge dev-meth dev-meth-get">GET</span> Danh sách ảnh</a>
+            <a class="list-group-item list-group-item-action dev-api-item" href="#ep-folder-create" data-text="folders tạo POST"><span class="badge dev-meth dev-meth-post">POST</span> Tạo thư mục</a>
+            <a class="list-group-item list-group-item-action dev-api-item" href="#ep-folder-delete" data-text="folders xóa DELETE"><span class="badge dev-meth dev-meth-del">DEL</span> Xóa thư mục</a>
+            <a class="list-group-item list-group-item-action dev-api-item" href="#ep-upload" data-text="upload POST multipart"><span class="badge dev-meth dev-meth-post">POST</span> Upload ảnh</a>
+            <a class="list-group-item list-group-item-action dev-api-item" href="#ep-photo-delete" data-text="photos xóa DELETE"><span class="badge dev-meth dev-meth-del">DEL</span> Xóa ảnh</a>
+            <a class="list-group-item list-group-item-action dev-api-item" href="#ep-media" data-text="media xem ảnh GET"><span class="badge dev-meth dev-meth-get">GET</span> Xem file ảnh</a>
+        </div>
+    </div>
+</div>

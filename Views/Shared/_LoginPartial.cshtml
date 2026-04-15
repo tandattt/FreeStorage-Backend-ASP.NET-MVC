@@ -1,9 +1,5 @@
-﻿@using Microsoft.AspNetCore.Identity
-@inject SignInManager<IdentityUser> SignInManager
-@inject UserManager<IdentityUser> UserManager
-
 <ul class="navbar-nav ms-md-auto nav-auth nav-auth-editorial flex-column flex-md-row align-items-stretch align-items-md-center gap-1 gap-md-2">
-@if (SignInManager.IsSignedIn(User))
+@if (User.Identity?.IsAuthenticated == true)
 {
     <li class="nav-item d-none d-lg-flex flex-column align-items-end text-end me-1">
         <span class="small fw-medium text-truncate" style="color: var(--ed-on-surface); max-width: 14rem;">@User.Identity?.Name</span>
@@ -12,7 +8,8 @@
         <span class="nav-link small text-secondary text-truncate mb-0 py-2" style="max-width: 14rem; cursor: default;">@User.Identity?.Name</span>
     </li>
     <li class="nav-item">
-        <form asp-area="Identity" asp-page="/Account/Logout" asp-route-returnUrl="@Url.Action("Index", "Home", new { area = "" })" method="post" class="d-inline w-100">
+        <form asp-controller="Account" asp-action="Logout" method="post" class="d-inline w-100">
+            @Html.AntiForgeryToken()
             <button type="submit" class="btn btn-link nav-link text-decoration-none border-0 py-2 px-2 w-100 text-md-start">Đăng xuất</button>
         </form>
     </li>
@@ -20,10 +17,10 @@
 else
 {
     <li class="nav-item">
-        <a class="nav-link nav-btn-outline rounded-pill px-3" asp-area="Identity" asp-page="/Account/Login">Đăng nhập</a>
+        <a class="nav-link nav-btn-outline rounded-pill px-3" asp-controller="Account" asp-action="Login">Đăng nhập</a>
     </li>
     <li class="nav-item">
-        <a class="nav-link nav-btn-solid rounded-pill px-3" asp-area="Identity" asp-page="/Account/Register">Đăng ký</a>
+        <a class="nav-link nav-btn-solid rounded-pill px-3" asp-controller="Account" asp-action="Register">Đăng ký</a>
     </li>
 }
 </ul>

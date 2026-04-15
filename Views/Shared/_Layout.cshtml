@@ -1,9 +1,49 @@
-﻿<!DOCTYPE html>
+﻿@{
+    var titlePart = ViewData["Title"] as string;
+    var fullTitle = string.IsNullOrEmpty(titlePart) ? "Storage Free" : $"{titlePart} — Storage Free";
+    var metaDesc = ViewData["Description"] as string;
+    var canonical = ViewData["Canonical"] as string;
+    var robots = ViewData["Robots"] as string;
+    var jsonLd = ViewData["JsonLd"] as string;
+}
+<!DOCTYPE html>
 <html lang="vi">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Storage Free</title>
+    <title>@fullTitle</title>
+    @if (!string.IsNullOrEmpty(metaDesc))
+    {
+        <meta name="description" content="@metaDesc" />
+    }
+    @if (!string.IsNullOrEmpty(canonical))
+    {
+        <link rel="canonical" href="@canonical" />
+    }
+    @if (!string.IsNullOrEmpty(robots))
+    {
+        <meta name="robots" content="@robots" />
+    }
+    <meta property="og:title" content="@fullTitle" />
+    @if (!string.IsNullOrEmpty(metaDesc))
+    {
+        <meta property="og:description" content="@metaDesc" />
+    }
+    <meta property="og:type" content="website" />
+    @if (!string.IsNullOrEmpty(canonical))
+    {
+        <meta property="og:url" content="@canonical" />
+    }
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="@fullTitle" />
+    @if (!string.IsNullOrEmpty(metaDesc))
+    {
+        <meta name="twitter:description" content="@metaDesc" />
+    }
+    @if (!string.IsNullOrEmpty(jsonLd))
+    {
+        <script type="application/ld+json">@Html.Raw(jsonLd)</script>
+    }
     <link rel="icon" type="image/png" sizes="32x32" href="~/favicon-32x32.png" asp-append-version="true" />
     <link rel="icon" type="image/png" href="~/favicon.png" asp-append-version="true" />
     <link rel="apple-touch-icon" href="~/apple-touch-icon.png" asp-append-version="true" />
@@ -31,7 +71,7 @@
                             <a class="nav-link" asp-area="" asp-controller="Home" asp-action="Index">Trang chủ</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Pricing" asp-action="Index">Pricing</a>
+                            <a class="nav-link" href="@Url.RouteUrl("pricing")">Bảng giá</a>
                         </li>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
@@ -40,6 +80,13 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" asp-area="" asp-controller="Photos" asp-action="Upload">Tải ảnh</a>
+                            </li>
+                            <li class="nav-item dropdown">
+                                <a class="nav-link dropdown-toggle" href="#" id="devMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">Developer</a>
+                                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="devMenu">
+                                    <li><a class="dropdown-item" href="@Url.RouteUrl("developerAlbumApi")">Tài liệu API</a></li>
+                                    <li><a class="dropdown-item" href="@Url.RouteUrl("developerApiKeys")">Khóa API</a></li>
+                                </ul>
                             </li>
                         }
                     </ul>
@@ -63,6 +110,7 @@
                 </div>
                 <div class="col-md-6 text-center text-md-end small text-secondary">
                     <span>&copy; @DateTime.UtcNow.Year — Storage Free · Album cá nhân trong tài khoản của bạn.</span>
+                    <span class="d-block d-md-inline ms-md-2 mt-2 mt-md-0"><a class="link-secondary" href="@Url.RouteUrl("privacy")">Chính sách quyền riêng tư</a></span>
                 </div>
             </div>
         </div>

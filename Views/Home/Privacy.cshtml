@@ -1,6 +1,31 @@
-@{
-    ViewData["Title"] = "Privacy Policy";
-}
-<h1>@ViewData["Title"]</h1>
+<nav aria-label="Breadcrumb" class="mb-4">
+    <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a asp-controller="Home" asp-action="Index">Trang chủ</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Chính sách quyền riêng tư</li>
+    </ol>
+</nav>
 
-<p>Use this page to detail your site's privacy policy.</p>
+<article class="surface-card p-4 p-md-5" style="border-radius: var(--radius-editorial);">
+    <header class="mb-4">
+        <h1 class="h3 mb-0">Chính sách quyền riêng tư</h1>
+    </header>
+    <div class="text-secondary small mb-4">Cập nhật gần nhất: @DateTime.UtcNow.Year</div>
+    <section class="mb-4">
+        <h2 class="h5">Dữ liệu chúng tôi xử lý</h2>
+        <p class="mb-0">
+            Storage Free cung cấp album ảnh gắn với tài khoản của bạn. Ảnh bạn tải lên được lưu để bạn xem và tải về trong phạm vi tài khoản.
+        </p>
+    </section>
+    <section class="mb-4">
+        <h2 class="h5">Cookies và phiên đăng nhập</h2>
+        <p class="mb-0">
+            Chúng tôi dùng cookie HttpOnly (access token và refresh token) để duy trì phiên đăng nhập; mật khẩu được băm bởi ASP.NET Identity.
+        </p>
+    </section>
+    <section>
+        <h2 class="h5">Liên hệ</h2>
+        <p class="mb-0">
+            Nếu bạn có câu hỏi về quyền riêng tư, hãy liên hệ quản trị viên dịch vụ qua kênh hỗ trợ của ứng dụng.
+        </p>
+    </section>
+</article>
