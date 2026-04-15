@@ -11,105 +11,459 @@
             @await Html.PartialAsync("_DeveloperApiList")
         </aside>
         <div class="col-lg-8 col-12 dev-docs-main">
-            <h1 class="h4 mb-2">API Album cho developer</h1>
-            <p class="text-secondary small mb-4">
-                Tạo khóa tại <a href="@keysUrl">Khóa API</a>. Mọi request REST dùng header
-                <code>X-Api-Key: &lt;clientId&gt;.&lt;secret&gt;</code> (hỗ trợ thêm <code>apikey</code>).
-                Trình duyệt khi đăng nhập vẫn dùng cookie JWT như cũ.
-            </p>
 
-            <section class="dev-doc-section mb-5" id="ep-auth">
-                <h2 class="h6 mb-2">1. Xác thực</h2>
-                <p class="small text-secondary mb-2">Headers mẫu:</p>
-                <pre class="dev-code-block"><code>{
-  "Content-Type": "application/json",
-  "X-Api-Key": "YOUR_FULL_KEY"
-}</code></pre>
-            </section>
-
-            <section class="dev-doc-section mb-5" id="ep-storage">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <span class="badge dev-meth dev-meth-get">GET</span>
-                    <span class="dev-doc-path">@apiRoot/storage</span>
-                </div>
-                <p class="small text-secondary mb-2">Dung lượng: <code>usedBytes</code>, <code>quotaBytes</code>, <code>usedPercent</code>, <code>totalImages</code>.</p>
-                <pre class="dev-code-block"><code>curl "@apiRoot/storage" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
-            </section>
-
-            <section class="dev-doc-section mb-5" id="ep-folders">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <span class="badge dev-meth dev-meth-get">GET</span>
-                    <span class="dev-doc-path">@apiRoot/folders?parentFolderId=&amp;page=1&amp;pageSize=50</span>
-                </div>
-                <ul class="small text-secondary mb-2">
-                    <li>Không gửi <code>parentFolderId</code> → thư mục gốc.</li>
-                    <li>Mỗi phần tử: <code>id</code>, <code>name</code>, <code>photoCount</code>, <code>parentFolderId</code>.</li>
-                </ul>
-                <pre class="dev-code-block"><code>curl "@apiRoot/folders?page=1&amp;pageSize=20" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
-            </section>
-
-            <section class="dev-doc-section mb-5" id="ep-photos">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <span class="badge dev-meth dev-meth-get">GET</span>
-                    <span class="dev-doc-path">@apiRoot/photos?folderId=&amp;page=1&amp;pageSize=24</span>
-                </div>
-                <ul class="small text-secondary mb-2">
-                    <li>Không có <code>folderId</code> → ảnh chưa gán thư mục.</li>
-                    <li>Có <code>folderId</code> → ảnh trong thư mục; <code>mediaUrl</code> khi đã xử lý.</li>
-                </ul>
-                <pre class="dev-code-block"><code>curl "@apiRoot/photos?page=1&amp;pageSize=12" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
-            </section>
-
-            <section class="dev-doc-section mb-5" id="ep-folder-create">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <span class="badge dev-meth dev-meth-post">POST</span>
-                    <span class="dev-doc-path">@apiRoot/folders</span>
-                </div>
-                <p class="small text-secondary mb-2">JSON: <code>name</code>, <code>parentFolderId</code> (tuỳ chọn).</p>
-                <pre class="dev-code-block"><code>curl -X POST "@apiRoot/folders" ^
-  -H "X-Api-Key: YOUR_FULL_KEY" -H "Content-Type: application/json" ^
-  -d "{\"name\":\"Thư mục A\",\"parentFolderId\":null}"</code></pre>
-            </section>
-
-            <section class="dev-doc-section mb-5" id="ep-folder-delete">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <span class="badge dev-meth dev-meth-del">DELETE</span>
-                    <span class="dev-doc-path">@apiRoot/folders/{id}</span>
-                </div>
-                <p class="small text-secondary mb-2">Xóa ảnh trực tiếp trong thư mục; thư mục con được đưa lên cấp trên.</p>
-                <pre class="dev-code-block"><code>curl -X DELETE "@apiRoot/folders/FOLDER-GUID" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
-            </section>
-
-            <section class="dev-doc-section mb-5" id="ep-upload">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <span class="badge dev-meth dev-meth-post">POST</span>
-                    <span class="dev-doc-path">@apiRoot/photos/upload</span>
-                </div>
-                <p class="small text-secondary mb-2"><code>multipart/form-data</code>: <code>files</code> (một hoặc nhiều), tuỳ chọn <code>folderId</code>.</p>
-                <pre class="dev-code-block"><code>curl -X POST "@apiRoot/photos/upload" ^
-  -H "X-Api-Key: YOUR_FULL_KEY" ^
-  -F "files=@@C:\path\photo.jpg" ^
-  -F "folderId="</code></pre>
-                <p class="small text-secondary mb-0">Tối đa @ImageUploadApp.Services.PhotoBatchUploadService.MaxFilesPerRequest ảnh mỗi lần.</p>
-            </section>
-
-            <section class="dev-doc-section mb-5" id="ep-photo-delete">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <span class="badge dev-meth dev-meth-del">DELETE</span>
-                    <span class="dev-doc-path">@apiRoot/photos/{id}</span>
-                </div>
-                <pre class="dev-code-block"><code>curl -X DELETE "@apiRoot/photos/IMAGE-GUID" -H "X-Api-Key: YOUR_FULL_KEY"</code></pre>
-            </section>
-
-            <section class="dev-doc-section mb-4" id="ep-media">
-                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
-                    <span class="badge dev-meth dev-meth-get">GET</span>
-                    <span class="dev-doc-path">@publicBase/media/{id}</span>
-                </div>
-                <p class="small text-secondary mb-0">
-                    Trả bytes ảnh đã xử lý. Gửi cùng <code>X-Api-Key</code> như API (hoặc session đăng nhập).
+            <header class="mb-4">
+                <h1 class="editorial-page-title" style="font-size: clamp(2rem, 4vw, 2.75rem);">API Album cho developer</h1>
+                <p class="editorial-page-sub mt-2 mb-0" style="max-width:38rem;">
+                    Hệ thống API mạnh mẽ cho phép các nhà phát triển tích hợp sâu và quản lý lưu trữ album một cách hiệu quả.
                 </p>
-            </section>
+            </header>
+
+            @* <section class="dev-ep-auth-section mb-4" id="ep-auth">
+                <div class="row g-4">
+                    <div class="col-lg-6">
+                        <div class="dev-ep-section-divider mt-0">
+                            <h2 style="font-size:1.25rem;">Authentication</h2>
+                        </div>
+                        <p class="dev-ep-desc mb-3">
+                            Tất cả các yêu cầu API đều yêu cầu xác thực thông qua header
+                            <code>X-Api-Key</code>. Bạn có thể tạo khóa tại
+                            <a href="@keysUrl">Khóa API</a>.
+                        </p>
+                        <div class="dev-ep-note">
+                            <span class="material-symbols-outlined">shield</span>
+                            <p>Giữ khóa API an toàn. Không chia sẻ trong ứng dụng phía client hoặc kho lưu trữ code công khai.</p>
+                        </div>
+                    </div>
+                    <div class="col-lg-6">
+                        <div class="dev-ep-code">
+                            <span class="dev-ep-code-lang">Request Headers</span>
+                            <pre><code>{
+  "Content-Type": "application/json",
+  "X-Api-Key": "your_clientId.secret"
+}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </section> *@
+
+            <div class="dev-ep-section-divider">
+                <h2>Endpoints</h2>
+            </div>
+
+            @* ── GET /storage ── *@
+            <div class="dev-ep-panel active" id="ep-storage">
+                <div class="dev-ep-body-block">
+                    <div class="dev-ep-head">
+                        <span class="badge dev-meth dev-meth-get">GET</span>
+                        <code class="dev-ep-path">@apiRoot/storage</code>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Example Usage</h3>
+                            <div class="dev-ep-code">
+                                <span class="dev-ep-code-lang">cURL</span>
+                                <pre><code>curl -X GET "@apiRoot/storage" \
+     -H "X-Api-Key: your_api_key"</code></pre>
+                            </div>
+                            <h3 class="dev-ep-label">Description</h3>
+                            <p class="dev-ep-desc">
+                                Endpoint này cung cấp thông tin chi tiết về dung lượng lưu trữ của album,
+                                bao gồm tổng dung lượng, phần đã sử dụng và phần còn trống.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Response Schema</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">usedBytes</code>
+                                    <span class="dev-ep-field-type">number</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Dung lượng hiện đang được sử dụng tính bằng bytes.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">quotaBytes</code>
+                                    <span class="dev-ep-field-type">number</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Tổng dung lượng lưu trữ được cấp phép tính bằng bytes.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">usedPercent</code>
+                                    <span class="dev-ep-field-type">number</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Phần trăm dung lượng đã sử dụng (0–100).</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">totalImages</code>
+                                    <span class="dev-ep-field-type">number</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Tổng số ảnh trong tài khoản.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── GET /folders ── *@
+            <div class="dev-ep-panel" id="ep-folders">
+                <div class="dev-ep-body-block">
+                    <div class="dev-ep-head">
+                        <span class="badge dev-meth dev-meth-get">GET</span>
+                        <code class="dev-ep-path">@apiRoot/folders?parentFolderId=&amp;page=1&amp;pageSize=50</code>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Example Usage</h3>
+                            <div class="dev-ep-code">
+                                <span class="dev-ep-code-lang">cURL</span>
+                                <pre><code>curl -X GET "@apiRoot/folders?page=1&amp;pageSize=20" \
+     -H "X-Api-Key: your_api_key"</code></pre>
+                            </div>
+                            <h3 class="dev-ep-label">Description</h3>
+                            <p class="dev-ep-desc">
+                                Lấy danh sách thư mục. Không gửi <code>parentFolderId</code> sẽ trả về thư mục gốc.
+                                Hỗ trợ phân trang với <code>page</code> và <code>pageSize</code>.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Response Schema</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">id</code>
+                                    <span class="dev-ep-field-type">string</span>
+                                </div>
+                                <p class="dev-ep-field-desc">ID duy nhất của thư mục (GUID).</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">name</code>
+                                    <span class="dev-ep-field-type">string</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Tên thư mục.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">photoCount</code>
+                                    <span class="dev-ep-field-type">number</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Số lượng ảnh trong thư mục.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">parentFolderId</code>
+                                    <span class="dev-ep-field-type">string?</span>
+                                </div>
+                                <p class="dev-ep-field-desc">ID thư mục cha (null nếu là gốc).</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── GET /photos ── *@
+            <div class="dev-ep-panel" id="ep-photos">
+                <div class="dev-ep-body-block">
+                    <div class="dev-ep-head">
+                        <span class="badge dev-meth dev-meth-get">GET</span>
+                        <code class="dev-ep-path">@apiRoot/photos?folderId=&amp;page=1&amp;pageSize=24</code>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Example Usage</h3>
+                            <div class="dev-ep-code">
+                                <span class="dev-ep-code-lang">cURL</span>
+                                <pre><code>curl -X GET "@apiRoot/photos?page=1&amp;pageSize=12" \
+     -H "X-Api-Key: your_api_key"</code></pre>
+                            </div>
+                            <h3 class="dev-ep-label">Description</h3>
+                            <p class="dev-ep-desc">
+                                Lấy danh sách ảnh. Không có <code>folderId</code> trả về ảnh chưa gán thư mục.
+                                Có <code>folderId</code> trả về ảnh trong thư mục đó. Mỗi ảnh bao gồm <code>mediaUrl</code> khi đã xử lý.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Response Schema</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">id</code>
+                                    <span class="dev-ep-field-type">string</span>
+                                </div>
+                                <p class="dev-ep-field-desc">ID duy nhất của ảnh (GUID).</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">fileName</code>
+                                    <span class="dev-ep-field-type">string</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Tên file gốc khi upload.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">mediaUrl</code>
+                                    <span class="dev-ep-field-type">string?</span>
+                                </div>
+                                <p class="dev-ep-field-desc">URL truy cập ảnh (null nếu đang xử lý).</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">folderId</code>
+                                    <span class="dev-ep-field-type">string?</span>
+                                </div>
+                                <p class="dev-ep-field-desc">ID thư mục chứa ảnh.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── POST /folders ── *@
+            <div class="dev-ep-panel" id="ep-folder-create">
+                <div class="dev-ep-body-block">
+                    <div class="dev-ep-head">
+                        <span class="badge dev-meth dev-meth-post">POST</span>
+                        <code class="dev-ep-path">@apiRoot/folders</code>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Example Usage</h3>
+                            <div class="dev-ep-code">
+                                <span class="dev-ep-code-lang">cURL</span>
+                                <pre><code>curl -X POST "@apiRoot/folders" \
+     -H "X-Api-Key: your_api_key" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Thư mục A","parentFolderId":null}'</code></pre>
+                            </div>
+                            <h3 class="dev-ep-label">Description</h3>
+                            <p class="dev-ep-desc">
+                                Tạo thư mục mới. Gửi JSON body với <code>name</code> (bắt buộc)
+                                và <code>parentFolderId</code> (tuỳ chọn, null cho thư mục gốc).
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Request Body</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">name</code>
+                                    <span class="dev-ep-field-type">string</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Tên thư mục cần tạo.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">parentFolderId</code>
+                                    <span class="dev-ep-field-type">string?</span>
+                                </div>
+                                <p class="dev-ep-field-desc">ID thư mục cha (null tạo ở gốc).</p>
+                            </div>
+                            <h3 class="dev-ep-label mt-3">Response Schema</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">id</code>
+                                    <span class="dev-ep-field-type">string</span>
+                                </div>
+                                <p class="dev-ep-field-desc">ID thư mục vừa tạo.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">name</code>
+                                    <span class="dev-ep-field-type">string</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Tên thư mục.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── DELETE /folders/{id} ── *@
+            <div class="dev-ep-panel" id="ep-folder-delete">
+                <div class="dev-ep-body-block">
+                    <div class="dev-ep-head">
+                        <span class="badge dev-meth dev-meth-del">DELETE</span>
+                        <code class="dev-ep-path">@apiRoot/folders/{id}</code>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Example Usage</h3>
+                            <div class="dev-ep-code">
+                                <span class="dev-ep-code-lang">cURL</span>
+                                <pre><code>curl -X DELETE "@apiRoot/folders/FOLDER-GUID" \
+     -H "X-Api-Key: your_api_key"</code></pre>
+                            </div>
+                            <h3 class="dev-ep-label">Description</h3>
+                            <p class="dev-ep-desc">
+                                Xóa thư mục theo ID. Ảnh trực tiếp trong thư mục sẽ bị xóa.
+                                Thư mục con được đưa lên cấp trên.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Response Schema</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">success</code>
+                                    <span class="dev-ep-field-type">boolean</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Trạng thái xóa thành công.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">deletedPhotos</code>
+                                    <span class="dev-ep-field-type">number</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Số ảnh đã bị xóa cùng thư mục.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── POST /photos/upload ── *@
+            <div class="dev-ep-panel" id="ep-upload">
+                <div class="dev-ep-body-block">
+                    <div class="dev-ep-head">
+                        <span class="badge dev-meth dev-meth-post">POST</span>
+                        <code class="dev-ep-path">@apiRoot/photos/upload</code>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Example Usage</h3>
+                            <div class="dev-ep-code">
+                                <span class="dev-ep-code-lang">cURL</span>
+                                <pre><code>curl -X POST "@apiRoot/photos/upload" \
+     -H "X-Api-Key: your_api_key" \
+     -F "files=@@/path/photo.jpg" \
+     -F "folderId="</code></pre>
+                            </div>
+                            <h3 class="dev-ep-label">Description</h3>
+                            <p class="dev-ep-desc">
+                                Upload ảnh bằng <code>multipart/form-data</code>. Gửi một hoặc nhiều <code>files</code>,
+                                tuỳ chọn <code>folderId</code> để gán thư mục.
+                            </p>
+                            <div class="dev-ep-note">
+                                <span class="material-symbols-outlined">info</span>
+                                <p>Tối đa @ImageUploadApp.Services.PhotoBatchUploadService.MaxFilesPerRequest ảnh mỗi lần upload.</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Request Body (multipart)</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">files</code>
+                                    <span class="dev-ep-field-type">file[]</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Một hoặc nhiều file ảnh cần upload.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">folderId</code>
+                                    <span class="dev-ep-field-type">string?</span>
+                                </div>
+                                <p class="dev-ep-field-desc">ID thư mục đích (tuỳ chọn).</p>
+                            </div>
+                            <h3 class="dev-ep-label mt-3">Response Schema</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">uploaded</code>
+                                    <span class="dev-ep-field-type">number</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Số ảnh upload thành công.</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">photos</code>
+                                    <span class="dev-ep-field-type">object[]</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Danh sách thông tin ảnh vừa upload.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── DELETE /photos/{id} ── *@
+            <div class="dev-ep-panel" id="ep-photo-delete">
+                <div class="dev-ep-body-block">
+                    <div class="dev-ep-head">
+                        <span class="badge dev-meth dev-meth-del">DELETE</span>
+                        <code class="dev-ep-path">@apiRoot/photos/{id}</code>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Example Usage</h3>
+                            <div class="dev-ep-code">
+                                <span class="dev-ep-code-lang">cURL</span>
+                                <pre><code>curl -X DELETE "@apiRoot/photos/IMAGE-GUID" \
+     -H "X-Api-Key: your_api_key"</code></pre>
+                            </div>
+                            <h3 class="dev-ep-label">Description</h3>
+                            <p class="dev-ep-desc">
+                                Xóa ảnh theo ID. Xóa vĩnh viễn ảnh khỏi hệ thống và giải phóng dung lượng.
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Response Schema</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">success</code>
+                                    <span class="dev-ep-field-type">boolean</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Trạng thái xóa thành công.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* ── GET /media/{id} ── *@
+            <div class="dev-ep-panel" id="ep-media">
+                <div class="dev-ep-body-block">
+                    <div class="dev-ep-head">
+                        <span class="badge dev-meth dev-meth-get">GET</span>
+                        <code class="dev-ep-path">@publicBase/media/{id}</code>
+                    </div>
+                    <div class="row g-4">
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Example Usage</h3>
+                            <div class="dev-ep-code">
+                                <span class="dev-ep-code-lang">cURL</span>
+                                <pre><code>curl -X GET "@publicBase/media/IMAGE-GUID" \
+     -H "X-Api-Key: your_api_key" \
+     --output photo.jpg</code></pre>
+                            </div>
+                            <h3 class="dev-ep-label">Description</h3>
+                            <p class="dev-ep-desc">
+                                Trả bytes ảnh đã xử lý. Gửi cùng <code>X-Api-Key</code> như các API khác
+                                (hoặc sử dụng session đăng nhập qua trình duyệt).
+                            </p>
+                        </div>
+                        <div class="col-lg-6">
+                            <h3 class="dev-ep-label">Response</h3>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">Content-Type</code>
+                                    <span class="dev-ep-field-type">header</span>
+                                </div>
+                                <p class="dev-ep-field-desc">MIME type của ảnh (image/jpeg, image/png, …).</p>
+                            </div>
+                            <div class="dev-ep-field">
+                                <div class="dev-ep-field-head">
+                                    <code class="dev-ep-field-name">body</code>
+                                    <span class="dev-ep-field-type">binary</span>
+                                </div>
+                                <p class="dev-ep-field-desc">Dữ liệu bytes của ảnh đã xử lý.</p>
+                            </div>
+                            <div class="dev-ep-note">
+                                <span class="material-symbols-outlined">info</span>
+                                <p>Endpoint này trả binary, không phải JSON. Sử dụng <code>--output</code> khi dùng cURL.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -117,16 +471,37 @@
 @section Scripts {
     <script>
         (function () {
-            var input = document.querySelector('.dev-api-search');
-            var items = document.querySelectorAll('.dev-api-item');
-            if (!input || !items.length) return;
-            input.addEventListener('input', function () {
-                var q = (input.value || '').trim().toLowerCase();
+            var items = document.querySelectorAll('.dev-api-item[data-ep]');
+            var panels = document.querySelectorAll('.dev-ep-panel');
+            if (!items.length || !panels.length) return;
+
+            function activate(epId) {
+                panels.forEach(function (p) { p.classList.remove('active'); });
+                items.forEach(function (a) { a.classList.remove('active'); });
+                var target = document.getElementById(epId);
+                if (target) target.classList.add('active');
                 items.forEach(function (a) {
-                    var t = (a.getAttribute('data-text') || a.textContent || '').toLowerCase();
-                    a.classList.toggle('d-none', q.length > 0 && t.indexOf(q) === -1);
+                    if (a.getAttribute('data-ep') === epId) a.classList.add('active');
+                });
+            }
+
+            items.forEach(function (a) {
+                a.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    activate(a.getAttribute('data-ep'));
                 });
             });
+
+            var input = document.querySelector('.dev-api-search');
+            if (input) {
+                input.addEventListener('input', function () {
+                    var q = (input.value || '').trim().toLowerCase();
+                    items.forEach(function (a) {
+                        var t = (a.getAttribute('data-text') || a.textContent || '').toLowerCase();
+                        a.classList.toggle('d-none', q.length > 0 && t.indexOf(q) === -1);
+                    });
+                });
+            }
         })();
     </script>
 }

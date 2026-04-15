@@ -1,6 +1,6 @@
 @model IReadOnlyList<ImageUploadApp.Services.UserApiKeyListItem>
 @{
-    ViewData["Title"] = "Khóa API";
+    ViewData["Title"] = "Premium API Keys Console";
 }
 <div class="dev-portal-page">
     <div class="row g-4 align-items-start">
@@ -8,11 +8,18 @@
             @await Html.PartialAsync("_DeveloperPortalNav")
         </aside>
         <div class="col-lg-8 col-12">
-            <h1 class="h4 mb-2">API keys</h1>
-            <p class="text-secondary small mb-4">
-                Khóa bí mật chỉ hiển thị <strong>một lần</strong> khi tạo. Không chia sẻ công khai.
-                Dùng header <code>X-Api-Key</code> với giá trị đầy đủ <code>clientId.secret</code>.
-            </p>
+
+            <header class="dev-keys-header">
+                <h1 class="editorial-page-title">API keys</h1>
+                <p class="editorial-page-sub mb-0">
+                    Khóa API của bạn là bí mật và cho phép truy cập trực tiếp vào tài khoản.
+                    Đừng chia sẻ chúng với bất kỳ ai hoặc hiển thị trong mã phía client.
+                </p>
+                <div class="dev-keys-usage-hint">
+                    <span class="material-symbols-outlined">info</span>
+                    X-Api-Key: &lt;YOUR_SECRET_KEY&gt;
+                </div>
+            </header>
 
             @if (TempData["ApiKeyError"] is string err)
             {
@@ -22,81 +29,144 @@
             {
                 <div class="alert alert-success py-2 small">@info</div>
             }
+
             @if (TempData["NewApiKey"] is string nk)
             {
-                <div class="alert alert-warning py-3">
-                    <div class="fw-semibold mb-1">Khóa mới (sao chép ngay)</div>
-                    <pre class="bg-white border rounded p-2 small mb-2 overflow-auto user-select-all">@nk</pre>
-                    <span class="small text-secondary">Không hiển thị lại sau khi rời trang.</span>
+                <div class="dev-keys-newkey-alert" id="newKeyAlert">
+                    <button type="button" class="btn-close position-absolute" style="top: 1rem; right: 1rem;" data-bs-dismiss="alert"></button>
+                    <div class="dev-keys-newkey-label">Vừa được tạo</div>
+                    <h6>Khóa bí mật mới của bạn</h6>
+                    <p class="text-secondary small mb-3">Sao chép ngay — bạn sẽ không thể xem lại khóa này.</p>
+                    <div class="dev-keys-newkey-value">
+                        <code id="newKeyValue">@nk</code>
+                        <button type="button" class="btn-copy-key" onclick="copyNewKey(event)" title="Sao chép khóa">
+                            <span class="material-symbols-outlined">content_copy</span>
+                        </button>
+                    </div>
                 </div>
             }
 
-            <div class="card border-0 shadow-sm mb-3">
-                <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0 small">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Tên</th>
-                                <th>Trạng thái</th>
-                                <th>Client ID</th>
-                                <th>Tạo lúc (UTC)</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @if (Model.Count == 0)
-                            {
+            <section class="dev-keys-create-section" id="create-key-section">
+                <h2>Tạo khóa mới</h2>
+                <form asp-controller="Developer" asp-action="CreateApiKey" method="post" class="d-flex flex-column flex-md-row gap-3 align-items-md-end">
+                    @Html.AntiForgeryToken()
+                    <div class="flex-grow-1">
+                        <label class="dev-keys-create-label">Tên hoặc mô tả</label>
+                        <input name="name" class="form-control" maxlength="120" placeholder="VD: Production-Web-App" required />
+                    </div>
+                    <button type="submit" class="btn btn-primary px-4 py-2 d-inline-flex align-items-center gap-2 flex-shrink-0">
+                        <span class="material-symbols-outlined" style="font-size: 1rem;">add</span>
+                        Tạo khóa bí mật
+                    </button>
+                </form>
+            </section>
+
+            <section class="dev-keys-table-section">
+                <div class="dev-keys-table-header">
+                    <h2>Danh sách khóa</h2>
+                    <span class="dev-keys-table-count">Tổng cộng: @Model.Count khóa</span>
+                </div>
+
+                @if (Model.Count == 0)
+                {
+                    <div class="dev-keys-empty">
+                        <span class="material-symbols-outlined d-block mx-auto">vpn_key</span>
+                        <h3 class="h5">Chưa có khóa API nào</h3>
+                        <p class="text-secondary mb-4">Tạo khóa đầu tiên để bắt đầu sử dụng API.</p>
+                        <a href="#create-key-section" class="btn btn-primary px-4 py-2">
+                            <span class="material-symbols-outlined me-1" style="font-size: 1rem;">add</span>
+                            Tạo khóa API đầu tiên
+                        </a>
+                    </div>
+                }
+                else
+                {
+                    <div class="dev-keys-table-wrap">
+                        <table class="dev-keys-table">
+                            <thead>
                                 <tr>
-                                    <td colspan="5" class="text-center text-secondary py-5">No Data</td>
+                                    <th>Tên</th>
+                                    <th>Trạng thái</th>
+                                    <th>Client ID</th>
+                                    <th>Tạo lúc UTC</th>
+                                    <th class="text-end">Hành động</th>
                                 </tr>
-                            }
-                            else
-                            {
-                                foreach (var row in Model)
+                            </thead>
+                            <tbody>
+                                @foreach (var row in Model)
                                 {
+                                    var displayId = row.ClientId.Length > 16
+                                        ? row.ClientId.Substring(0, 8) + "..." + row.ClientId.Substring(row.ClientId.Length - 4)
+                                        : row.ClientId;
                                     <tr>
-                                        <td class="fw-medium">@row.Name</td>
+                                        <td><span class="key-name">@row.Name</span></td>
                                         <td>
                                             @if (row.IsActive)
                                             {
-                                                <span class="badge text-bg-success">Active</span>
+                                                <span class="key-status key-status--active">Hoạt động</span>
                                             }
                                             else
                                             {
-                                                <span class="badge text-bg-secondary">Revoked</span>
+                                                <span class="key-status key-status--revoked">Đã thu hồi</span>
                                             }
                                         </td>
-                                        <td><code class="small">@row.ClientId</code></td>
-                                        <td>@row.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                                        <td>
+                                            <code class="key-clientid" title="@row.ClientId" role="button" onclick="copyClientId(event, '@row.ClientId')">@displayId</code>
+                                        </td>
+                                        <td><span class="key-date">@row.CreatedAtUtc.ToString("yyyy-MM-dd HH:mm")</span></td>
                                         <td class="text-end">
                                             @if (row.IsActive)
                                             {
-                                                <form asp-controller="Developer" asp-action="RevokeApiKey" method="post" class="d-inline" onsubmit="return confirm('Thu hồi khóa này?');">
+                                                <form asp-controller="Developer" asp-action="RevokeApiKey" method="post" class="d-inline" onsubmit='return confirm("Xác nhận thu hồi khóa này?");'>
                                                     @Html.AntiForgeryToken()
                                                     <input type="hidden" name="id" value="@row.Id" />
-                                                    <button type="submit" class="btn btn-sm btn-outline-danger">Thu hồi</button>
+                                                    <button type="submit" class="btn-revoke">Thu hồi</button>
                                                 </form>
                                             }
                                         </td>
                                     </tr>
                                 }
-                            }
-                        </tbody>
-                    </table>
-                </div>
-            </div>
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </section>
 
-            <form asp-controller="Developer" asp-action="CreateApiKey" method="post" class="card border-0 shadow-sm p-3">
-                @Html.AntiForgeryToken()
-                <label class="form-label small fw-semibold">Tạo khóa mới</label>
-                <div class="input-group input-group-sm">
-                    <input name="name" class="form-control" maxlength="120" placeholder="VD: Production-Web-App" required />
-                    <button type="submit" class="btn btn-primary">
-                        <span class="material-symbols-outlined align-middle" style="font-size:1.1rem;">add</span>
-                        Create a New Secret Key
-                    </button>
-                </div>
-            </form>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <script>
+        function copyNewKey(e) {
+            const el = document.getElementById('newKeyValue');
+            if (!el) return;
+            navigator.clipboard.writeText(el.textContent.trim()).then(() => {
+                const btn = e.target.closest('.btn-copy-key');
+                if (!btn) return;
+                const icon = btn.querySelector('.material-symbols-outlined');
+                if (!icon) return;
+                icon.textContent = 'check';
+                btn.style.background = '#065f46';
+                setTimeout(() => {
+                    icon.textContent = 'content_copy';
+                    btn.style.background = '';
+                }, 1500);
+            });
+        }
+
+        function copyClientId(e, id) {
+            navigator.clipboard.writeText(id).then(() => {
+                const el = e.target.closest('.key-clientid');
+                if (!el) return;
+                const orig = el.textContent;
+                el.textContent = 'Đã sao chép!';
+                el.style.color = '#065f46';
+                setTimeout(() => {
+                    el.textContent = orig;
+                    el.style.color = '';
+                }, 1500);
+            });
+        }
+    </script>
+}
