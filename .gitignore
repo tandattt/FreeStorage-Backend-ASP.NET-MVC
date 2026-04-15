@@ -43,6 +43,10 @@ coverage*.info
 *.VC.db
 *.VC.VC.opendb
 
+##  Cursor
+.cursor/
+.cursorrules
+
 ## VS Code (giữ settings nếu cần — bỏ dòng này nếu muốn commit .vscode)
 .vscode/*
 !.vscode/settings.json
@@ -69,3 +73,4 @@ $RECYCLE.BIN/
 *~
 .env
 .env.*
+
