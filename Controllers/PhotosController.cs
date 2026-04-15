@@ -1,16 +1,13 @@
 using System.Security.Cryptography;
 using System.Text;
-using Hangfire;
 using ImageUploadApp.Data;
+using ImageUploadApp.Infrastructure;
 using ImageUploadApp.Models;
 using ImageUploadApp.Services;
-using ImageUploadApp.Services.Jobs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using SixLabors.ImageSharp;
-
 namespace ImageUploadApp.Controllers;
 
 [Authorize]
@@ -18,49 +15,50 @@ public class PhotosController : Controller
 {
     private readonly ApplicationDbContext _db;
     private readonly UserManager<IdentityUser> _users;
-    private readonly IImageEncodingService _imageEncoding;
     private readonly IWebHostEnvironment _env;
-    private readonly IBackgroundJobClient _backgroundJobs;
     private readonly ILogger<PhotosController> _log;
-    private readonly ITelegramNotifyService _telegram;
+    private readonly IPhotoFolderService _folders;
+    private readonly IPhotoBatchUploadService _batchUpload;
 
     public PhotosController(
         ApplicationDbContext db,
         UserManager<IdentityUser> users,
-        IImageEncodingService imageEncoding,
         IWebHostEnvironment env,
-        IBackgroundJobClient backgroundJobs,
         ILogger<PhotosController> log,
-        ITelegramNotifyService telegram)
+        IPhotoFolderService folders,
+        IPhotoBatchUploadService batchUpload)
     {
         _db = db;
         _users = users;
-        _imageEncoding = imageEncoding;
         _env = env;
-        _backgroundJobs = backgroundJobs;
         _log = log;
-        _telegram = telegram;
+        _folders = folders;
+        _batchUpload = batchUpload;
     }
 
-    public async Task<IActionResult> Index(int page = 1, int pageSize = 12, int cols = 6, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Index(Guid? folderId, int page = 1, int pageSize = 12, int cols = 6, CancellationToken cancellationToken = default)
     {
         var userId = _users.GetUserId(User);
         if (string.IsNullOrEmpty(userId))
             return Challenge();
 
-        var vm = await BuildPhotosIndexVmAsync(userId, page, pageSize, cols, cancellationToken);
+        var vm = await BuildPhotosIndexVmAsync(userId, folderId, page, pageSize, cols, cancellationToken);
+        this.SetSeo(
+            "Ảnh đã tải lên",
+            "Album riêng của bạn trên Storage Free — chỉ tài khoản đăng nhập mới xem được.",
+            "noindex, nofollow",
+            null);
         return View(vm);
     }
 
-    /// <summary>Poll 5s: so sánh revision — không đổi thì không cần cập nhật DOM.</summary>
     [HttpGet]
-    public async Task<IActionResult> Sync(int page = 1, int pageSize = 12, int cols = 6, string? revision = null, CancellationToken cancellationToken = default)
+    public async Task<IActionResult> Sync(Guid? folderId, int page = 1, int pageSize = 12, int cols = 6, string? revision = null, CancellationToken cancellationToken = default)
     {
         var userId = _users.GetUserId(User);
         if (string.IsNullOrEmpty(userId))
             return Unauthorized();
 
-        var vm = await BuildPhotosIndexVmAsync(userId, page, pageSize, cols, cancellationToken);
+        var vm = await BuildPhotosIndexVmAsync(userId, folderId, page, pageSize, cols, cancellationToken);
 
         if (!string.IsNullOrWhiteSpace(revision)
             && string.Equals(revision.Trim(), vm.Revision, StringComparison.OrdinalIgnoreCase))
@@ -74,6 +72,7 @@ public class PhotosController : Controller
 
         var items = vm.Items.Select(x => new {
             id = x.Id,
+            folderId = x.FolderId,
             createdAt = x.CreatedAt.ToString("O"),
             dateLabel = x.CreatedAt.LocalDateTime.ToString("g"),
             isPending = x.IsPending,
@@ -82,6 +81,9 @@ public class PhotosController : Controller
             downloadUrl = x.DownloadUrl,
         });
 
+        var childFolders = vm.ChildFolders.Select(f => new { id = f.Id, name = f.Name, photoCount = f.PhotoCount }).ToList();
+        var breadcrumb = vm.Breadcrumb.Select(b => new { id = b.Id, name = b.Name }).ToList();
+
         return Json(new {
             changed = true,
             revision = vm.Revision,
@@ -89,6 +91,7 @@ public class PhotosController : Controller
             usedSizeLabel = vm.UsedSizeLabel,
             quotaPercent = vm.QuotaPercent,
             totalCount = vm.TotalCount,
+            totalLibraryCount = vm.TotalLibraryCount,
             from,
             to,
             totalPages = vm.TotalPages,
@@ -96,12 +99,105 @@ public class PhotosController : Controller
             pageSize = vm.PageSize,
             cols = vm.Cols,
             compactGrid,
+            folderId = vm.FolderId,
+            parentFolderId = vm.ParentFolderId,
+            childFolders,
+            breadcrumb,
             items,
         });
     }
 
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CreateFolder(string name, Guid? parentFolderId, CancellationToken cancellationToken = default)
+    {
+        var userId = _users.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Challenge();
+
+        var (ok, err, id) = await _folders.CreateAsync(userId, name, parentFolderId, cancellationToken);
+        if (!ok)
+        {
+            TempData["Error"] = err;
+            return RedirectToAction(nameof(Index), parentFolderId.HasValue ? new { folderId = parentFolderId } : null);
+        }
+
+        return RedirectToAction(nameof(Index), new { folderId = id });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteFolder(Guid folderId, CancellationToken cancellationToken = default)
+    {
+        var userId = _users.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Challenge();
+
+        var (ok, err, redirectParentId) = await _folders.DeleteFolderAsync(userId, folderId, cancellationToken);
+        if (!ok)
+            TempData["Error"] = err;
+        return RedirectToAction(nameof(Index), redirectParentId.HasValue ? new { folderId = redirectParentId } : null);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MovePhotosBulk(string imageIds, Guid? targetFolderId, Guid? returnFolderId, CancellationToken cancellationToken = default)
+    {
+        var userId = _users.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Challenge();
+
+        var ids = new List<Guid>();
+        foreach (var part in (imageIds ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Guid.TryParse(part, out var g))
+                ids.Add(g);
+        }
+
+        var (ok, err, _) = await _folders.MoveImagesBulkAsync(userId, ids, targetFolderId, cancellationToken);
+        if (!ok)
+            TempData["Error"] = err;
+        return RedirectToAction(nameof(Index), new { folderId = returnFolderId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> MovePhoto(Guid imageId, Guid? targetFolderId, Guid? returnFolderId, CancellationToken cancellationToken = default)
+    {
+        var userId = _users.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Challenge();
+
+        var (ok, err) = await _folders.MoveImageAsync(userId, imageId, targetFolderId, cancellationToken);
+        if (!ok)
+            TempData["Error"] = err;
+        return RedirectToAction(nameof(Index), new { folderId = returnFolderId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> DeleteImage(Guid imageId, Guid? returnFolderId, CancellationToken cancellationToken = default)
+    {
+        var userId = _users.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Challenge();
+
+        var img = await _db.Images.FirstOrDefaultAsync(i => i.Id == imageId && i.UserId == userId, cancellationToken);
+        if (img is null)
+        {
+            TempData["Error"] = "Không tìm thấy ảnh.";
+            return RedirectToAction(nameof(Index), returnFolderId.HasValue ? new { folderId = returnFolderId } : null);
+        }
+
+        PendingImageFileHelper.TryDeleteForImage(img.PendingFilePath, _env, _log);
+        _db.Images.Remove(img);
+        await _db.SaveChangesAsync(cancellationToken);
+        TempData["Message"] = "Đã xóa ảnh.";
+        return RedirectToAction(nameof(Index), returnFolderId.HasValue ? new { folderId = returnFolderId } : null);
+    }
+
     private async Task<PhotosIndexVm> BuildPhotosIndexVmAsync(
-        string userId, int page, int pageSize, int cols, CancellationToken cancellationToken)
+        string userId, Guid? folderId, int page, int pageSize, int cols, CancellationToken cancellationToken)
     {
         int[] allowedPageSizes = [6, 12, 24, 48];
         if (!allowedPageSizes.Contains(pageSize))
@@ -112,9 +208,31 @@ public class PhotosController : Controller
         if (page < 1)
             page = 1;
 
-        var baseQuery = _db.Images.AsNoTracking().Where(x => x.UserId == userId);
+        Guid? effectiveFolderId = folderId;
+        PhotoFolder? ownedFolder = null;
+        if (effectiveFolderId.HasValue)
+        {
+            ownedFolder = await _folders.GetOwnedFolderAsync(userId, effectiveFolderId.Value, cancellationToken);
+            if (ownedFolder is null)
+                effectiveFolderId = null;
+        }
 
-        var usedBytes = await baseQuery.SumAsync(x => x.StoredSizeBytes ?? 0L, cancellationToken);
+        var childFolders = await _folders.ListChildFoldersWithCountsAsync(userId, effectiveFolderId, cancellationToken);
+        var breadcrumb = await _folders.GetBreadcrumbAsync(userId, effectiveFolderId, cancellationToken);
+        string? folderName = ownedFolder?.Name;
+
+        var baseQuery = _db.Images.AsNoTracking().Where(x => x.UserId == userId);
+        if (effectiveFolderId.HasValue)
+            baseQuery = baseQuery.Where(x => x.FolderId == effectiveFolderId.Value);
+        else
+            baseQuery = baseQuery.Where(x => x.FolderId == null);
+
+        var usedBytes = await _db.Images.AsNoTracking()
+            .Where(x => x.UserId == userId)
+            .SumAsync(x => x.StoredSizeBytes ?? 0L, cancellationToken);
+
+        var totalLibraryCount = await _db.Images.AsNoTracking()
+            .CountAsync(x => x.UserId == userId, cancellationToken);
 
         var totalCount = await baseQuery.CountAsync(cancellationToken);
 
@@ -126,11 +244,12 @@ public class PhotosController : Controller
             .OrderByDescending(x => x.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new { x.Id, x.CreatedAt, x.SourceUrl, x.PipelineFailed })
+            .Select(x => new { x.Id, x.FolderId, x.CreatedAt, x.SourceUrl, x.PipelineFailed })
             .ToListAsync(cancellationToken);
 
         var list = rows.Select(x => new PhotoItemVm {
             Id = x.Id,
+            FolderId = x.FolderId,
             CreatedAt = x.CreatedAt,
             IsPending = x.SourceUrl == null && !x.PipelineFailed,
             IsFailed = x.PipelineFailed && x.SourceUrl == null,
@@ -138,9 +257,15 @@ public class PhotosController : Controller
             DownloadUrl = x.SourceUrl == null ? null : Url.Action(nameof(MediaController.Get), "Media", new { id = x.Id, download = true }),
         }).ToList();
 
-        var rev = ComputePhotosRevision(usedBytes, totalCount, list);
+        var rev = ComputePhotosRevision(effectiveFolderId, usedBytes, totalCount, childFolders, list);
 
         return new PhotosIndexVm {
+            FolderId = effectiveFolderId,
+            FolderName = folderName,
+            ChildFolders = childFolders,
+            Breadcrumb = breadcrumb,
+            ParentFolderId = ownedFolder?.ParentFolderId,
+            TotalLibraryCount = totalLibraryCount,
             Items = list,
             Page = page,
             PageSize = pageSize,
@@ -151,10 +276,18 @@ public class PhotosController : Controller
         };
     }
 
-    private static string ComputePhotosRevision(long usedBytes, int totalCount, IReadOnlyList<PhotoItemVm> items)
+    private static string ComputePhotosRevision(
+        Guid? folderId,
+        long usedBytes,
+        int totalCount,
+        IReadOnlyList<PhotoFolderListItem> childFolders,
+        IReadOnlyList<PhotoItemVm> items)
     {
-        var sb = new StringBuilder(64 + items.Count * 48);
-        sb.Append(usedBytes).Append('|').Append(totalCount).Append('|');
+        var sb = new StringBuilder(80 + items.Count * 48 + childFolders.Count * 40);
+        sb.Append(folderId?.ToString("N") ?? "all").Append('|').Append(usedBytes).Append('|').Append(totalCount).Append('|');
+        foreach (var f in childFolders.OrderBy(x => x.Id))
+            sb.Append('F').Append(f.Id.ToString("N")).Append(':').Append(f.PhotoCount).Append(';');
+        sb.Append('|');
         foreach (var x in items)
         {
             var state = x.IsPending ? 'p' : x.IsFailed ? 'f' : 'r';
@@ -165,7 +298,6 @@ public class PhotosController : Controller
         return Convert.ToHexString(hash)[..16];
     }
 
-    /// <summary>JSON cho poll: chỉ ảnh của user, lọc theo ids (cách nhau bởi dấu phẩy).</summary>
     [HttpGet]
     public async Task<IActionResult> Status([FromQuery] string? ids, CancellationToken cancellationToken)
     {
@@ -207,18 +339,61 @@ public class PhotosController : Controller
     }
 
     [HttpGet]
-    public IActionResult Upload() => View();
+    public async Task<IActionResult> Upload(Guid? folderId, CancellationToken cancellationToken = default)
+    {
+        var userId = _users.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Challenge();
 
-    /// <summary>Tối đa số file mỗi request (client chia batch; giảm 413 / request quá lớn).</summary>
-    public const int MaxFilesPerUploadRequest = 150;
+        if (folderId.HasValue)
+        {
+            var f = await _folders.GetOwnedFolderAsync(userId, folderId.Value, cancellationToken);
+            if (f is null)
+                folderId = null;
+            else
+            {
+                ViewData["UploadFolderId"] = folderId.Value;
+                ViewData["UploadFolderName"] = f.Name;
+            }
+        }
+
+        SetUploadPageSeo();
+        return View();
+    }
+
+    private void SetUploadPageSeo()
+    {
+        this.SetSeo(
+            "Tải ảnh",
+            "Tải ảnh lên album riêng trên Storage Free — hỗ trợ nhiều file mỗi lần.",
+            "noindex, nofollow",
+            "/Photos/Upload");
+    }
+
+    private async Task ApplyUploadFolderViewDataAsync(string userId, Guid? folderId, CancellationToken cancellationToken)
+    {
+        if (!folderId.HasValue)
+            return;
+        var f = await _folders.GetOwnedFolderAsync(userId, folderId.Value, cancellationToken);
+        if (f is null)
+            return;
+        ViewData["UploadFolderId"] = folderId.Value;
+        ViewData["UploadFolderName"] = f.Name;
+    }
+
+    public const int MaxFilesPerUploadRequest = PhotoBatchUploadService.MaxFilesPerRequest;
 
     [HttpPost]
     [ValidateAntiForgeryToken]
     [RequestFormLimits(MultipartBodyLengthLimit = 524_288_000)]
     [RequestSizeLimit(524_288_000)]
-    public async Task<IActionResult> Upload(List<IFormFile>? files, CancellationToken cancellationToken)
+    public async Task<IActionResult> Upload(List<IFormFile>? files, Guid? folderId, CancellationToken cancellationToken)
     {
         var wantsJson = string.Equals(Request.Headers["X-Batch-Upload"], "1", StringComparison.Ordinal);
+
+        var userId = _users.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Challenge();
 
         var chosen = files?.Where(f => f is { Length: > 0 }).ToList() ?? [];
         if (chosen.Count == 0)
@@ -226,6 +401,8 @@ public class PhotosController : Controller
             ModelState.AddModelError(string.Empty, "Vui lòng chọn ít nhất một file ảnh.");
             if (wantsJson)
                 return BadRequest(new { ok = false, errors = new[] { "Vui lòng chọn ít nhất một file ảnh." } });
+            await ApplyUploadFolderViewDataAsync(userId, folderId, cancellationToken);
+            SetUploadPageSeo();
             return View();
         }
 
@@ -235,143 +412,30 @@ public class PhotosController : Controller
             ModelState.AddModelError(string.Empty, msg);
             if (wantsJson)
                 return BadRequest(new { ok = false, errors = new[] { msg } });
+            await ApplyUploadFolderViewDataAsync(userId, folderId, cancellationToken);
+            SetUploadPageSeo();
             return View();
         }
 
-        var userId = _users.GetUserId(User);
-        if (string.IsNullOrEmpty(userId))
-            return Challenge();
+        var userEntity = await _users.GetUserAsync(User);
+        var notifyEmail = userEntity?.Email ?? userId;
+        var result = await _batchUpload.UploadAsync(userId, notifyEmail, chosen, folderId, cancellationToken);
 
-        var pendingDir = Path.Combine(_env.ContentRootPath, "App_Data", "pending");
-        Directory.CreateDirectory(pendingDir);
-
-        var errors = new List<string>();
-        var enqueued = 0;
-        long batchBytes = 0;
-
-        var usedBytes = await _db.Images
-            .Where(x => x.UserId == userId)
-            .SumAsync(x => x.StoredSizeBytes ?? 0L, cancellationToken);
-
-        const long maxImageBytes = 120 * 1024 * 1024; // khớp tầm form limit
-
-        foreach (var file in chosen)
+        if (result.Enqueued == 0)
         {
-            if (file.Length > maxImageBytes)
-            {
-                errors.Add($"{DisplayName(file)}: vượt quá {maxImageBytes / (1024 * 1024)} MB.");
-                continue;
-            }
-
-            var metaErr = ImageUploadGuard.ValidateMetadata(file);
-            if (metaErr is not null)
-            {
-                errors.Add(metaErr);
-                continue;
-            }
-
-            var (headerOk, headerErr) = await ImageUploadGuard.ValidateHeaderAsync(file, cancellationToken);
-            if (!headerOk)
-            {
-                if (headerErr is not null)
-                    errors.Add(headerErr);
-                continue;
-            }
-
-            var (dimOk, dimErr) = await ImageUploadGuard.ValidateDimensionsAsync(file, cancellationToken);
-            if (!dimOk)
-            {
-                if (dimErr is not null)
-                    errors.Add(dimErr);
-                continue;
-            }
-
-            byte[] jpeg;
-            try
-            {
-                await using var readStream = file.OpenReadStream();
-                jpeg = await _imageEncoding.ToJpegAsync(readStream, cancellationToken);
-            }
-            catch (UnknownImageFormatException)
-            {
-                errors.Add($"{DisplayName(file)}: không đọc được như ảnh (decode thất bại).");
-                continue;
-            }
-
-            var newSize = (long)jpeg.Length;
-            if (usedBytes + batchBytes + newSize > StorageLimits.PerUserQuotaBytes)
-            {
-                errors.Add($"{DisplayName(file)}: vượt hạn mức 5 GB cho tài khoản (đã dùng ~{usedBytes / (1024.0 * 1024.0):0.#} MB).");
-                continue;
-            }
-
-            var id = Guid.NewGuid();
-            var fileName = $"{id:N}.jpg";
-            var fullPath = Path.Combine(pendingDir, fileName);
-            await System.IO.File.WriteAllBytesAsync(fullPath, jpeg, cancellationToken);
-
-            _db.Images.Add(new ImageRecord
-            {
-                Id = id,
-                UserId = userId,
-                SourceUrl = null,
-                PendingFilePath = fileName,
-                OriginalFileName = file.FileName,
-                CreatedAt = DateTimeOffset.UtcNow,
-                StoredSizeBytes = newSize,
-            });
-
-            await _db.SaveChangesAsync(cancellationToken);
-
-            _backgroundJobs.Enqueue<ImagePipelineJob>(j => j.ProcessAsync(id));
-            batchBytes += newSize;
-            enqueued++;
-        }
-
-        if (enqueued > 0)
-        {
-            try
-            {
-                var userEntity = await _users.GetUserAsync(User);
-                var notifyEmail = userEntity?.Email ?? userId;
-                await _telegram.NotifyUploadBatchAsync(notifyEmail, enqueued, batchBytes, cancellationToken);
-            }
-            catch (Exception ex)
-            {
-                // Ảnh đã lưu + job đã enqueue; không được làm hỏng JSON trả về cho client.
-                _log.LogWarning(ex, "Notify sau khi upload: bỏ qua, phản hồi JSON vẫn trả về bình thường.");
-            }
-        }
-
-        if (enqueued == 0)
-        {
-            foreach (var e in errors)
+            foreach (var e in result.Errors)
                 ModelState.AddModelError(string.Empty, e);
             if (wantsJson)
-                return BadRequest(new { ok = false, errors = errors.ToArray() });
+                return BadRequest(new { ok = false, errors = result.Errors.ToArray() });
+            await ApplyUploadFolderViewDataAsync(userId, result.EffectiveFolderId, cancellationToken);
+            SetUploadPageSeo();
             return View();
         }
 
-        string flash;
-        if (errors.Count > 0)
-            flash = enqueued == 1
-                ? $"Đã nhận 1 ảnh để xử lý. {errors.Count} file bị bỏ qua."
-                : $"Đã nhận {enqueued} ảnh để xử lý. {errors.Count} file bị bỏ qua.";
-        else
-            flash = enqueued == 1
-                ? "Đã thêm ảnh vào album (đang tải lên trong nền)."
-                : $"Đã thêm {enqueued} ảnh vào album (đang tải lên trong nền).";
-
         if (wantsJson)
-            return Json(new { ok = true, enqueued, skipped = errors.Count, message = flash });
+            return Json(new { ok = true, enqueued = result.Enqueued, skipped = result.Skipped, message = result.Message });
 
-        TempData["Message"] = flash;
-        return RedirectToAction(nameof(Index));
-    }
-
-    private static string DisplayName(IFormFile file)
-    {
-        var n = Path.GetFileName(file.FileName);
-        return string.IsNullOrEmpty(n) ? "(không tên)" : n;
+        TempData["Message"] = result.Message;
+        return RedirectToAction(nameof(Index), new { folderId = result.EffectiveFolderId });
     }
 }

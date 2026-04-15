@@ -3,6 +3,9 @@ namespace ImageUploadApp.Models;
 public class PhotoItemVm
 {
     public Guid Id { get; set; }
+
+    public Guid? FolderId { get; set; }
+
     public DateTimeOffset CreatedAt { get; set; }
     /// <summary>null khi chưa có ảnh (job đang chạy).</summary>
     public string? ProxyUrl { get; set; }
