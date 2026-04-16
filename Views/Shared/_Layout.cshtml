@@ -73,6 +73,9 @@
                         <li class="nav-item">
                             <a class="nav-link" href="@Url.RouteUrl("pricing")">Bảng giá</a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="@Url.RouteUrl("developerAlbumApi")">API</a>
+                        </li>
                         @if (User.Identity?.IsAuthenticated == true)
                         {
                             <li class="nav-item">
@@ -103,14 +106,29 @@
 
     <footer class="app-footer app-footer--editorial mt-auto py-5">
         <div class="container-fluid px-3 px-lg-4 main-shell editorial-shell mx-auto">
-            <div class="row align-items-center gy-4">
-                <div class="col-md-6 text-center text-md-start">
+            <div class="row gy-4">
+                <div class="col-lg-6 text-center text-lg-start">
                     <div class="footer-brand mb-2">Storage Free</div>
-                    <p class="small text-secondary mb-0">Bảo quản kỹ thuật số an toàn cho khoảnh khắc quý giá của bạn.</p>
+                    <p class="small text-secondary mb-2">
+                        Nền tảng cloud lưu trữ free giúp bạn lưu ảnh miễn phí, quản lý album online và chia sẻ quy trình tích hợp API cho developer.
+                    </p>
+                    <p class="small text-secondary mb-0">
+                        Giải pháp host ảnh miễn phí, truy cập nhanh trên điện thoại và máy tính.
+                    </p>
                 </div>
-                <div class="col-md-6 text-center text-md-end small text-secondary">
-                    <span>&copy; @DateTime.UtcNow.Year — Storage Free · Album cá nhân trong tài khoản của bạn.</span>
-                    <span class="d-block d-md-inline ms-md-2 mt-2 mt-md-0"><a class="link-secondary" href="@Url.RouteUrl("privacy")">Chính sách quyền riêng tư</a></span>
+                <div class="col-lg-3 text-center text-lg-start">
+                    <div class="small fw-semibold mb-2">Liên kết chính</div>
+                    <ul class="list-unstyled small mb-0">
+                        <li><a class="link-secondary" asp-controller="Home" asp-action="Index">Trang chủ</a></li>
+                        <li><a class="link-secondary" href="@Url.RouteUrl("pricing")">Bảng giá</a></li>
+                        <li><a class="link-secondary" href="@Url.RouteUrl("developerAlbumApi")">API Docs</a></li>
+                        <li><a class="link-secondary" href="@Url.RouteUrl("privacy")">Chính sách quyền riêng tư</a></li>
+                    </ul>
+                </div>
+                <div class="col-lg-3 text-center text-lg-end small text-secondary">
+                    <div>&copy; @DateTime.UtcNow.Year — Storage Free</div>
+                    <div class="mt-2"><a class="link-secondary" href="/sitemap.xml">Sitemap XML</a></div>
+                    <div><a class="link-secondary" href="/robots.txt">Robots.txt</a></div>
                 </div>
             </div>
         </div>

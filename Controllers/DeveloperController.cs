@@ -13,13 +13,14 @@ public class DeveloperController : Controller
 
     public DeveloperController(IApiKeyService apiKeys) => _apiKeys = apiKeys;
 
+    [AllowAnonymous]
     [HttpGet]
     public IActionResult AlbumApiDocs()
     {
         this.SetSeo(
-            "API Album (developer)",
-            "Tài liệu REST API album: API key, thư mục, upload, dung lượng.",
-            "noindex, nofollow",
+            "API lưu ảnh miễn phí trên cloud cho developer",
+            "Tài liệu REST API lưu ảnh miễn phí: quản lý thư mục, upload ảnh online, kiểm tra dung lượng cloud storage free.",
+            "index, follow",
             "/developer/album-api");
         ViewData["PublicBaseUrl"] = this.GetPublicBaseUrl();
         ViewData["DeveloperNav"] = "docs";

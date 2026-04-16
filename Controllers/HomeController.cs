@@ -11,8 +11,8 @@ public class HomeController : Controller
     public IActionResult Index()
     {
         this.SetSeo(
-            "Trang chủ",
-            "Lưu trữ ảnh cá nhân riêng tư: album chỉ bạn xem, tối ưu màn hình, tải về bất cứ lúc nào.",
+            "Cloud lưu trữ ảnh miễn phí, upload ảnh online free",
+            "Storage Free là nền tảng cloud lưu trữ free giúp bạn lưu ảnh miễn phí, quản lý album online và tải ảnh mọi lúc trên mọi thiết bị.",
             null,
             "/");
 
@@ -20,10 +20,29 @@ public class HomeController : Controller
         ViewData["JsonLd"] = JsonSerializer.Serialize(new Dictionary<string, object?>
         {
             ["@context"] = "https://schema.org",
-            ["@type"] = "WebSite",
-            ["name"] = "Storage Free",
-            ["url"] = $"{origin}/",
-            ["description"] = "Dịch vụ album ảnh riêng tư — đăng ký để lưu và quản lý ảnh của bạn an toàn."
+            ["@graph"] = new object[]
+            {
+                new Dictionary<string, object?>
+                {
+                    ["@type"] = "WebSite",
+                    ["name"] = "Storage Free",
+                    ["url"] = $"{origin}/",
+                    ["description"] = "Nền tảng cloud lưu trữ ảnh miễn phí, upload ảnh online free và quản lý album cá nhân."
+                },
+                new Dictionary<string, object?>
+                {
+                    ["@type"] = "Service",
+                    ["name"] = "Dịch vụ lưu ảnh miễn phí",
+                    ["serviceType"] = "Cloud image storage",
+                    ["provider"] = new Dictionary<string, object?>
+                    {
+                        ["@type"] = "Organization",
+                        ["name"] = "Storage Free"
+                    },
+                    ["areaServed"] = "VN",
+                    ["url"] = $"{origin}/"
+                }
+            }
         });
 
         return View();

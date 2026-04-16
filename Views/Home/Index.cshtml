@@ -1,11 +1,11 @@
-<section class="hero hero--editorial p-4 p-md-5 mb-4 mb-md-5">
+i<section class="hero hero--editorial p-4 p-md-5 mb-4 mb-md-5">
     <div class="hero-inner">
         <div class="row align-items-center g-4 g-lg-5">
             <div class="col-lg-7">
-                <span class="hero-badge">Riêng tư · Album cá nhân</span>
-                <h1 class="display-6 mb-3">Lưu ảnh của bạn, xem và tải về trong một nơi an toàn</h1>
+                <span class="hero-badge">Cloud lưu trữ free · Lưu ảnh miễn phí</span>
+                <h1 class="display-6 mb-3">Lưu ảnh miễn phí trên cloud, quản lý album online nhanh và riêng tư</h1>
                 <p class="lead mb-4">
-                    Đăng ký hoặc đăng nhập để có album riêng. Chỉ bạn mới xem được ảnh trong tài khoản — thuận tiện quản lý và tải về khi cần.
+                    Storage Free là nền tảng lưu ảnh online free giúp bạn upload ảnh miễn phí, sắp xếp album rõ ràng và tải ảnh về bất cứ lúc nào trên mọi thiết bị.
                 </p>
                 @if (User.Identity?.IsAuthenticated == true)
                 {
@@ -17,21 +17,44 @@
                 else
                 {
                     <div class="d-flex flex-column flex-sm-row gap-2 gap-sm-3">
-                        <a class="btn btn-light btn-pill px-4" asp-controller="Account" asp-action="Register">Đăng ký</a>
+                        <a class="btn btn-light btn-pill px-4" asp-controller="Account" asp-action="Register">Đăng ký miễn phí</a>
                         <a class="btn btn-outline-light btn-pill px-4" asp-controller="Account" asp-action="Login">Đăng nhập</a>
                     </div>
                 }
             </div>
             <div class="col-lg-5">
                 <div class="hero-panel rounded-4 p-4 p-md-4">
-                    <p class="small text-uppercase fw-semibold mb-3 opacity-75" style="letter-spacing: 0.08em;">Bạn nhận được</p>
+                    <h2 class="h5 mb-3">Vì sao chọn cloud lưu trữ ảnh miễn phí tại Storage Free?</h2>
                     <ul class="list-unstyled mb-0">
-                        <li class="mb-3">Tài khoản riêng, chỉ bạn truy cập được album</li>
-                        <li class="mb-3">Ảnh được tối ưu để xem mượt trên mọi thiết bị</li>
-                        <li class="mb-3">Tải ảnh về máy bất cứ lúc nào</li>
-                        <li>Giao diện thân thiện cả trên điện thoại</li>
+                        <li class="mb-3">Lưu ảnh miễn phí với album cá nhân dễ quản lý</li>
+                        <li class="mb-3">Tốc độ tải ảnh nhanh, xem mượt trên điện thoại và máy tính</li>
+                        <li class="mb-3">Hỗ trợ tải ảnh gốc về bất kỳ lúc nào bạn cần</li>
+                        <li>Có trang API public cho lập trình viên tích hợp nhanh</li>
                     </ul>
                 </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="mb-4 mb-md-5">
+    <div class="row g-4">
+        <div class="col-lg-6">
+            <div class="p-4 rounded-4 border h-100">
+                <h2 class="h4 mb-3">Cloud lưu trữ free phù hợp cho ai?</h2>
+                <p class="mb-0">
+                    Phù hợp cho người dùng cá nhân muốn lưu ảnh kỷ niệm, người bán hàng online cần host ảnh miễn phí,
+                    và developer cần giải pháp lưu ảnh cloud free để tích hợp vào ứng dụng.
+                </p>
+            </div>
+        </div>
+        <div class="col-lg-6">
+            <div class="p-4 rounded-4 border h-100">
+                <h2 class="h4 mb-3">FAQ nhanh về lưu ảnh miễn phí</h2>
+                <p class="mb-2"><strong>Lưu ảnh miễn phí có an toàn không?</strong></p>
+                <p class="mb-3">Album được quản lý theo tài khoản, giúp bạn kiểm soát ảnh tốt hơn.</p>
+                <p class="mb-2"><strong>Tôi có thể dùng API không cần đăng nhập để xem docs?</strong></p>
+                <p class="mb-0">Có. Trang tài liệu API đã public để bạn xem endpoint và cách tích hợp dễ dàng.</p>
             </div>
         </div>
     </div>

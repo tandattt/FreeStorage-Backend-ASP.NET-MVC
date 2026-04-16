@@ -24,6 +24,7 @@ public sealed class SeoController : Controller
             $"{baseUrl}/",
             $"{baseUrl}/pricing",
             $"{baseUrl}/privacy",
+            $"{baseUrl}/developer/album-api",
         };
 
         XNamespace ns = "http://www.sitemaps.org/schemas/sitemap/0.9";
@@ -46,7 +47,10 @@ public sealed class SeoController : Controller
         var baseUrl = ResolveOrigin();
         var sb = new StringBuilder();
         sb.AppendLine("User-agent: *");
+        sb.AppendLine("Allow: /");
         sb.AppendLine("Disallow: /Photos");
+        sb.AppendLine("Disallow: /Account/Manage");
+        sb.AppendLine("Disallow: /developer/api-keys");
         sb.AppendLine("Disallow: /media");
         sb.AppendLine();
         sb.Append("Sitemap: ").AppendLine($"{baseUrl}/sitemap.xml");
