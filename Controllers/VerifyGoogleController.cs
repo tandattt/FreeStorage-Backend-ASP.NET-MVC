@@ -6,8 +6,9 @@ public sealed class VerifyGoogleController : Controller
 {
     [HttpGet("/google297b3fb6c5124652.html")]
     [Produces("text/html")]
-    public ContentResult GoogleSiteVerification()
+    public PhysicalFileResult GoogleSiteVerification()
     {
-        return Content("google-site-verification: google297b3fb6c5124652.html", "text/html");
+        var filePath = Path.Combine(Directory.GetCurrentDirectory(), "Views", "Verify_Google", "google297b3fb6c5124652.html");
+        return PhysicalFile(filePath, "text/html; charset=utf-8");
     }
 }
