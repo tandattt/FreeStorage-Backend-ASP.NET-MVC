@@ -254,7 +254,7 @@ public class PhotosController : Controller
             IsPending = x.SourceUrl == null && !x.PipelineFailed,
             IsFailed = x.PipelineFailed && x.SourceUrl == null,
             ProxyUrl = x.SourceUrl == null ? null : Url.Action(nameof(MediaController.Get), "Media", new { id = x.Id }),
-            DownloadUrl = x.SourceUrl == null ? null : Url.Action(nameof(MediaController.Get), "Media", new { id = x.Id, download = true }),
+            DownloadUrl = x.SourceUrl == null ? null : Url.Action(nameof(MediaController.Get), "Media", new { id = x.Id}),
         }).ToList();
 
         var rev = ComputePhotosRevision(effectiveFolderId, usedBytes, totalCount, childFolders, list);

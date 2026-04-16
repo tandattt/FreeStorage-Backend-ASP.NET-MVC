@@ -220,7 +220,13 @@ else
                 <div class="photo-thumb editorial-thumb position-relative @(item.IsPending || item.IsFailed ? "" : "photo-thumb--zoom")">
                     @if (!item.IsPending && !item.IsFailed)
                     {
-                        <div class="photo-select-wrap position-absolute top-0 end-0 p-2" style="z-index: 4;">
+                        <div class="photo-select-wrap position-absolute top-0 end-0 p-2 d-flex align-items-center gap-2" style="z-index: 4;">
+                            <button type="button" class="btn btn-sm btn-light border shadow-sm photo-copy-url-btn p-1 d-inline-flex align-items-center justify-content-center"
+                                    title="Sao chép URL ảnh"
+                                    aria-label="Sao chép URL ảnh"
+                                    data-copy-url="@($"{Context.Request.Scheme}://{Context.Request.Host}{(string.IsNullOrWhiteSpace(item.DownloadUrl) ? item.ProxyUrl : item.DownloadUrl)}")">
+                                <span class="material-symbols-outlined" style="font-size: 1.05rem;">link</span>
+                            </button>
                             <input type="checkbox" class="form-check-input photo-select-cb shadow-sm" title="Chọn ảnh" />
                         </div>
                     }
@@ -561,7 +567,10 @@ else
                 } else {
                     var pu = escAttr(item.proxyUrl || '');
                     var du = escAttr(item.downloadUrl || item.proxyUrl || '');
-                    var selBox = '<div class="photo-select-wrap position-absolute top-0 end-0 p-2" style="z-index: 4;">' +
+                    var copyUrl = escAttr(item.downloadUrl || item.proxyUrl || '');
+                    var selBox = '<div class="photo-select-wrap position-absolute top-0 end-0 p-2 d-flex align-items-center gap-2" style="z-index: 4;">' +
+                        '<button type="button" class="btn btn-sm btn-light border shadow-sm photo-copy-url-btn p-1 d-inline-flex align-items-center justify-content-center" title="Sao chép URL ảnh" aria-label="Sao chép URL ảnh" data-copy-url="' + (copyUrl && /^https?:\/\//i.test(copyUrl) ? copyUrl : (window.location.origin + copyUrl)) + '">' +
+                        '<span class="material-symbols-outlined" style="font-size: 1.05rem;">link</span></button>' +
                         '<input type="checkbox" class="form-check-input photo-select-cb shadow-sm" title="Chọn ảnh" /></div>';
                     thumbInner = selBox + '<div class="position-relative w-100 h-100 photo-thumb-inner">' +
                         '<img src="' + pu + '" alt="Ảnh đã tải" loading="lazy" decoding="async" class="photo-img" />' +
@@ -606,6 +615,25 @@ else
                     if (!t || !t.classList || !t.classList.contains('photo-select-cb')) return;
                     var card = t.closest('.photo-card');
                     if (card) card.classList.toggle('photo-card--selected', t.checked);
+                });
+                grid.addEventListener('click', function (e) {
+                    var copyBtn = e.target.closest('.photo-copy-url-btn');
+                    if (copyBtn && grid.contains(copyBtn)) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var url = copyBtn.getAttribute('data-copy-url') || '';
+                        if (!url || !navigator.clipboard || !navigator.clipboard.writeText) return;
+                        navigator.clipboard.writeText(url).then(function () {
+                            var icon = copyBtn.querySelector('.material-symbols-outlined');
+                            if (!icon) return;
+                            var old = icon.textContent;
+                            icon.textContent = 'check';
+                            window.setTimeout(function () {
+                                icon.textContent = old || 'link';
+                            }, 1200);
+                        }).catch(function () { });
+                        return;
+                    }
                 });
                 grid.addEventListener('click', function (e) {
                     var card = e.target.closest('.photo-card');
