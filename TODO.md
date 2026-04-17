@@ -1,0 +1,4 @@
+- [x] Cập nhật UI ảnh trong `Views/Photos/Index.cshtml` để thêm nút copy URL bên trái checkbox.
+- [x] Cập nhật `buildCardHtml()` trong script sync để render nút copy URL tương tự.
+- [x] Thêm xử lý click copy clipboard + đổi icon `link` -> `check` tạm thời.
+- [x] Rà soát logic để hoạt động cho cả render server và render polling.
