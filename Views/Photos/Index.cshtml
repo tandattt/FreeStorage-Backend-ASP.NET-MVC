@@ -443,6 +443,52 @@ else
             (function () {
                 const modalEl = document.getElementById('photoLightbox');
                 if (!modalEl || typeof bootstrap === 'undefined') return;
+                const mobileMq = window.matchMedia('(max-width: 767.98px)');
+
+                async function shareImageToDevice(url) {
+                    if (!url || !navigator.share) return false;
+
+                    const res = await fetch(url, {
+                        credentials: 'same-origin'
+                    });
+                    if (!res.ok) throw new Error('Khong tai duoc anh de chia se.');
+
+                    const blob = await res.blob();
+                    const contentType = blob.type || 'image/jpeg';
+                    let extension = '.jpg';
+                    if (contentType === 'image/png') extension = '.png';
+                    else if (contentType === 'image/webp') extension = '.webp';
+                    else if (contentType === 'image/gif') extension = '.gif';
+
+                    const file = new File([blob], 'storage-free' + extension, { type: contentType });
+                    if (navigator.canShare && !navigator.canShare({ files: [file] })) return false;
+
+                    await navigator.share({
+                        title: 'Anh',
+                        files: [file]
+                    });
+                    return true;
+                }
+
+                const lightboxAction = document.getElementById('photoLightboxDl');
+                if (lightboxAction) {
+                    lightboxAction.addEventListener('click', async function (e) {
+                        if (!mobileMq.matches) return;
+                        const href = lightboxAction.getAttribute('href') || '';
+                        if (!href) return;
+
+                        e.preventDefault();
+                        try {
+                            const shared = await shareImageToDevice(href);
+                            if (shared) return;
+                        } catch (err) {
+                            if (err && err.name === 'AbortError') return;
+                        }
+
+                        window.open(href, '_blank', 'noopener');
+                    });
+                }
+
                 modalEl.addEventListener('show.bs.modal', function (e) {
                     const t = e.relatedTarget;
                     if (!t || !t.classList.contains('photo-zoom-open')) return;
@@ -451,7 +497,14 @@ else
                     const img = document.getElementById('photoLightboxImg');
                     const a = document.getElementById('photoLightboxDl');
                     if (img) img.src = src;
-                    if (a) { a.href = dl; a.setAttribute('download', ''); }
+                    if (a) {
+                        a.href = mobileMq.matches ? src : dl;
+                        if (mobileMq.matches) {
+                            a.removeAttribute('download');
+                        } else {
+                            a.setAttribute('download', '');
+                        }
+                    }
                 });
                 modalEl.addEventListener('hidden.bs.modal', function () {
                     const img = document.getElementById('photoLightboxImg');
