@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+
 namespace ImageUploadApp.Controllers;
 
 [Authorize]
@@ -147,13 +148,7 @@ public class PhotosController : Controller
         if (string.IsNullOrEmpty(userId))
             return Challenge();
 
-        var ids = new List<Guid>();
-        foreach (var part in (imageIds ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (Guid.TryParse(part, out var g))
-                ids.Add(g);
-        }
-
+        var ids = ParseImageIds(imageIds);
         var (ok, err, _) = await _folders.MoveImagesBulkAsync(userId, ids, targetFolderId, cancellationToken);
         if (!ok)
             TempData["Error"] = err;
@@ -172,6 +167,87 @@ public class PhotosController : Controller
         if (!ok)
             TempData["Error"] = err;
         return RedirectToAction(nameof(Index), new { folderId = returnFolderId });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SharePhotos([Bind(Prefix = "ShareInput")] PhotoShareInputModel input, CancellationToken cancellationToken = default)
+    {
+        var userId = _users.GetUserId(User);
+        if (string.IsNullOrEmpty(userId))
+            return Challenge();
+
+        if (!ModelState.IsValid)
+        {
+            TempData["Error"] = ModelState.Values
+                .SelectMany(x => x.Errors)
+                .Select(x => x.ErrorMessage)
+                .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))
+                ?? "Không thể chia sẻ ảnh.";
+            return RedirectToAction(nameof(Index), input.ReturnFolderId.HasValue ? new { folderId = input.ReturnFolderId } : null);
+        }
+
+        var imageIds = ParseImageIds(input.ImageIds);
+        if (imageIds.Count == 0)
+        {
+            TempData["Error"] = "Hãy chọn ít nhất một ảnh để chia sẻ.";
+            return RedirectToAction(nameof(Index), input.ReturnFolderId.HasValue ? new { folderId = input.ReturnFolderId } : null);
+        }
+
+        var recipient = await _users.FindByEmailAsync(input.RecipientEmail);
+        if (recipient is null)
+        {
+            TempData["Error"] = "Email người nhận chưa có tài khoản trong hệ thống.";
+            return RedirectToAction(nameof(Index), input.ReturnFolderId.HasValue ? new { folderId = input.ReturnFolderId } : null);
+        }
+
+        if (string.Equals(recipient.Id, userId, StringComparison.Ordinal))
+        {
+            TempData["Error"] = "Bạn không cần tự chia sẻ ảnh cho chính mình.";
+            return RedirectToAction(nameof(Index), input.ReturnFolderId.HasValue ? new { folderId = input.ReturnFolderId } : null);
+        }
+
+        var ownedImageIds = await _db.Images
+            .AsNoTracking()
+            .Where(x => x.UserId == userId && imageIds.Contains(x.Id) && x.SourceUrl != null)
+            .Select(x => x.Id)
+            .ToListAsync(cancellationToken);
+
+        if (ownedImageIds.Count == 0)
+        {
+            TempData["Error"] = "Không tìm thấy ảnh hợp lệ để chia sẻ.";
+            return RedirectToAction(nameof(Index), input.ReturnFolderId.HasValue ? new { folderId = input.ReturnFolderId } : null);
+        }
+
+        var existingSharedIds = await _db.ImageShares
+            .AsNoTracking()
+            .Where(x => x.OwnerUserId == userId && x.RecipientUserId == recipient.Id && ownedImageIds.Contains(x.ImageId))
+            .Select(x => x.ImageId)
+            .ToListAsync(cancellationToken);
+
+        var toCreate = ownedImageIds
+            .Except(existingSharedIds)
+            .Select(imageId => new ImageShareRecord
+            {
+                Id = Guid.NewGuid(),
+                ImageId = imageId,
+                OwnerUserId = userId,
+                RecipientUserId = recipient.Id,
+                CreatedAt = DateTimeOffset.UtcNow,
+            })
+            .ToList();
+
+        if (toCreate.Count > 0)
+        {
+            _db.ImageShares.AddRange(toCreate);
+            await _db.SaveChangesAsync(cancellationToken);
+        }
+
+        TempData["Message"] = toCreate.Count > 0
+            ? $"Đã chia sẻ {toCreate.Count} ảnh cho {recipient.Email ?? recipient.UserName ?? "người nhận"}."
+            : $"Các ảnh đã được chia sẻ trước đó cho {recipient.Email ?? recipient.UserName ?? "người nhận"}.";
+
+        return RedirectToAction(nameof(Index), input.ReturnFolderId.HasValue ? new { folderId = input.ReturnFolderId } : null);
     }
 
     [HttpPost]
@@ -247,19 +323,43 @@ public class PhotosController : Controller
             .Select(x => new { x.Id, x.FolderId, x.CreatedAt, x.SourceUrl, x.PipelineFailed })
             .ToListAsync(cancellationToken);
 
-        var list = rows.Select(x => new PhotoItemVm {
+        var list = rows.Select(x => new PhotoItemVm
+        {
             Id = x.Id,
             FolderId = x.FolderId,
             CreatedAt = x.CreatedAt,
             IsPending = x.SourceUrl == null && !x.PipelineFailed,
             IsFailed = x.PipelineFailed && x.SourceUrl == null,
             ProxyUrl = x.SourceUrl == null ? null : Url.Action(nameof(MediaController.Get), "Media", new { id = x.Id }),
-            DownloadUrl = x.SourceUrl == null ? null : Url.Action(nameof(MediaController.Get), "Media", new { id = x.Id}),
+            DownloadUrl = x.SourceUrl == null ? null : Url.Action(nameof(MediaController.Get), "Media", new { id = x.Id, download = true }),
         }).ToList();
+
+        var sharedItems = new List<PhotoItemVm>();
+        if (!effectiveFolderId.HasValue)
+        {
+            sharedItems = await _db.ImageShares
+                .AsNoTracking()
+                .Where(x => x.RecipientUserId == userId && x.Image != null && x.Image.SourceUrl != null)
+                .OrderByDescending(x => x.CreatedAt)
+                .Select(x => new PhotoItemVm
+                {
+                    Id = x.ImageId,
+                    CreatedAt = x.Image!.CreatedAt,
+                    ProxyUrl = Url.Action(nameof(MediaController.Get), "Media", new { id = x.ImageId }),
+                    DownloadUrl = Url.Action(nameof(MediaController.Get), "Media", new { id = x.ImageId, download = true }),
+                    IsPending = false,
+                    IsFailed = false,
+                    IsSharedWithViewer = true,
+                    SharedAt = x.CreatedAt,
+                    SharedByDisplayName = x.OwnerUser!.Email ?? x.OwnerUser.UserName,
+                })
+                .ToListAsync(cancellationToken);
+        }
 
         var rev = ComputePhotosRevision(effectiveFolderId, usedBytes, totalCount, childFolders, list);
 
-        return new PhotosIndexVm {
+        return new PhotosIndexVm
+        {
             FolderId = effectiveFolderId,
             FolderName = folderName,
             ChildFolders = childFolders,
@@ -267,6 +367,8 @@ public class PhotosController : Controller
             ParentFolderId = ownedFolder?.ParentFolderId,
             TotalLibraryCount = totalLibraryCount,
             Items = list,
+            SharedItems = sharedItems,
+            ShareInput = new PhotoShareInputModel { ReturnFolderId = effectiveFolderId },
             Page = page,
             PageSize = pageSize,
             TotalCount = totalCount,
@@ -308,13 +410,7 @@ public class PhotosController : Controller
         if (string.IsNullOrWhiteSpace(ids))
             return Json(new { items = Array.Empty<object>() });
 
-        var guidList = new List<Guid>();
-        foreach (var part in ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-        {
-            if (Guid.TryParse(part, out var g))
-                guidList.Add(g);
-        }
-
+        var guidList = ParseImageIds(ids);
         if (guidList.Count == 0)
             return Json(new { items = Array.Empty<object>() });
 
@@ -437,5 +533,17 @@ public class PhotosController : Controller
 
         TempData["Message"] = result.Message;
         return RedirectToAction(nameof(Index), new { folderId = result.EffectiveFolderId });
+    }
+
+    private static List<Guid> ParseImageIds(string? imageIds)
+    {
+        var ids = new List<Guid>();
+        foreach (var part in (imageIds ?? string.Empty).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Guid.TryParse(part, out var guid))
+                ids.Add(guid);
+        }
+
+        return ids;
     }
 }

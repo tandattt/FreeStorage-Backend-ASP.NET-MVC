@@ -14,6 +14,8 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser, IdentityRole
 
     public DbSet<ImageRecord> Images => Set<ImageRecord>();
 
+    public DbSet<ImageShareRecord> ImageShares => Set<ImageShareRecord>();
+
     public DbSet<PhotoFolder> PhotoFolders => Set<PhotoFolder>();
 
     public DbSet<RefreshTokenRecord> RefreshTokens => Set<RefreshTokenRecord>();
@@ -53,6 +55,27 @@ public class ApplicationDbContext : IdentityDbContext<IdentityUser, IdentityRole
                 .WithMany()
                 .HasForeignKey(x => x.FolderId)
                 .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        builder.Entity<ImageShareRecord>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ImageId);
+            e.HasIndex(x => x.OwnerUserId);
+            e.HasIndex(x => x.RecipientUserId);
+            e.HasIndex(x => new { x.ImageId, x.RecipientUserId }).IsUnique();
+            e.HasOne(x => x.Image)
+                .WithMany()
+                .HasForeignKey(x => x.ImageId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.OwnerUser)
+                .WithMany()
+                .HasForeignKey(x => x.OwnerUserId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.RecipientUser)
+                .WithMany()
+                .HasForeignKey(x => x.RecipientUserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<RefreshTokenRecord>(e =>

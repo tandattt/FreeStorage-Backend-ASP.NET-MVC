@@ -35,10 +35,19 @@ public class MediaController : Controller
             return Challenge();
 
         var row = await _db.Images.AsNoTracking()
-            .FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId, cancellationToken);
+            .FirstOrDefaultAsync(x => x.Id == id, cancellationToken);
 
         if (row is null)
             return NotFound();
+
+        if (!string.Equals(row.UserId, userId, StringComparison.Ordinal))
+        {
+            var hasShare = await _db.ImageShares.AsNoTracking()
+                .AnyAsync(x => x.ImageId == id && x.RecipientUserId == userId, cancellationToken);
+
+            if (!hasShare)
+                return NotFound();
+        }
 
         if (string.IsNullOrEmpty(row.SourceUrl))
             return NotFound();

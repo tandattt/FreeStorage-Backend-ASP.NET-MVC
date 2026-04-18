@@ -1,0 +1,39 @@
+@model PhotoItemVm
+@{
+    var compactGrid = (ViewData["CompactGrid"] as bool?) ?? false;
+}
+
+<article class="card photo-card editorial-card border-0 h-100 @(compactGrid ? "photo-card-compact" : "")">
+    <div class="photo-thumb editorial-thumb position-relative photo-thumb--zoom">
+        <div class="position-absolute top-0 start-0 p-2" style="z-index: 4;">
+            <span class="badge text-bg-light border shadow-sm">Từ @Model.SharedByDisplayName</span>
+        </div>
+        <div class="position-relative w-100 h-100 photo-thumb-inner">
+            <img src="@Model.ProxyUrl" alt="Ảnh được chia sẻ" loading="lazy" decoding="async" class="photo-img" />
+            <button type="button"
+                    class="photo-zoom-open btn position-absolute top-0 start-0 w-100 h-100 p-0 border-0 bg-transparent"
+                    data-bs-toggle="modal" data-bs-target="#photoLightbox"
+                    data-img="@Model.ProxyUrl" data-download="@Model.DownloadUrl"
+                    aria-label="Xem ảnh phóng to"></button>
+        </div>
+    </div>
+    <div class="card-body photo-card__details d-none d-md-flex flex-column p-4 @(compactGrid ? "pb-2 pt-3" : "")">
+        <div class="mb-3 @(compactGrid ? "mb-0" : "")">
+            <p class="photo-meta-label">Được chia sẻ bởi</p>
+            <p class="small mb-1 photo-date" style="color: var(--ed-on-surface);">@Model.SharedByDisplayName</p>
+            @if (Model.SharedAt.HasValue)
+            {
+                <p class="small mb-0 text-secondary">Lúc @Model.SharedAt.Value.LocalDateTime.ToString("g")</p>
+            }
+        </div>
+        @if (!compactGrid)
+        {
+            <div class="mt-auto photo-dl-slot">
+                <a class="btn-editorial-download photo-download" href="@Model.DownloadUrl" download>
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem;">download</span>
+                    Tải xuống
+                </a>
+            </div>
+        }
+    </div>
+</article>

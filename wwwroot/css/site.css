@@ -661,7 +661,7 @@ body.theme-editorial .ratio.photo-thumb:not(.editorial-thumb) {
 }
 
 /* Grid — desktop / tablet */
-#photo-grid.photo-grid-responsive {
+.photo-grid-responsive {
   --photo-cols: 6;
   display: grid;
   gap: 2rem;
@@ -669,27 +669,27 @@ body.theme-editorial .ratio.photo-thumb:not(.editorial-thumb) {
 }
 
 @media (min-width: 576px) {
-  #photo-grid.photo-grid-responsive {
+  .photo-grid-responsive {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (min-width: 768px) and (max-width: 991.98px) {
-  #photo-grid.photo-grid-responsive--library {
+  .photo-grid-responsive--library {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 0.5rem;
   }
 }
 
 @media (min-width: 992px) {
-  #photo-grid.photo-grid-responsive {
+  .photo-grid-responsive {
     grid-template-columns: repeat(var(--photo-cols, 6), minmax(0, 1fr));
   }
 }
 
 /* Phone: dense square grid like iOS / Android Photos */
 @media (max-width: 767.98px) {
-  #photo-grid.photo-grid-responsive--library {
+  .photo-grid-responsive--library {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2px;
     width: calc(100% + 1.5rem);
@@ -699,26 +699,26 @@ body.theme-editorial .ratio.photo-thumb:not(.editorial-thumb) {
     overflow: hidden;
   }
 
-  body.theme-editorial #photo-grid.photo-grid-responsive--library .photo-card.editorial-card {
+  body.theme-editorial .photo-grid-responsive--library .photo-card.editorial-card {
     border-radius: 0 !important;
     box-shadow: none !important;
     transition: none;
   }
 
-  body.theme-editorial #photo-grid.photo-grid-responsive--library .photo-card.editorial-card:hover {
+  body.theme-editorial .photo-grid-responsive--library .photo-card.editorial-card:hover {
     transform: none;
     box-shadow: none !important;
   }
 
-  body.theme-editorial #photo-grid.photo-grid-responsive--library .photo-thumb.editorial-thumb {
+  body.theme-editorial .photo-grid-responsive--library .photo-thumb.editorial-thumb {
     aspect-ratio: 1;
   }
 
-  body.theme-editorial #photo-grid.photo-grid-responsive--library .editorial-thumb .photo-img {
+  body.theme-editorial .photo-grid-responsive--library .editorial-thumb .photo-img {
     transition: none;
   }
 
-  body.theme-editorial #photo-grid.photo-grid-responsive--library .photo-card.editorial-card:hover .photo-img {
+  body.theme-editorial .photo-grid-responsive--library .photo-card.editorial-card:hover .photo-img {
     transform: none;
   }
 }

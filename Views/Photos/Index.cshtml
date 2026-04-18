@@ -3,7 +3,7 @@
     var from = Model.TotalCount == 0 ? 0 : (Model.Page - 1) * Model.PageSize + 1;
     var to = Model.TotalCount == 0 ? 0 : Math.Min(Model.Page * Model.PageSize, Model.TotalCount);
     var compactGrid = Model.Cols >= 8;
-    var explorerHasItems = Model.ChildFolders.Count > 0 || Model.TotalCount > 0;
+    var explorerHasItems = Model.ChildFolders.Count > 0 || Model.TotalCount > 0 || (!Model.FolderId.HasValue && Model.SharedItems.Count > 0);
 }
 
 @if (TempData["Message"] is string msg)
@@ -198,6 +198,22 @@ else
             <button type="button" class="btn btn-sm btn-link px-2" id="photo-clear-selection">Bỏ chọn</button>
             <span class="small text-secondary" id="photo-selection-hint">Giữ Ctrl và bấm ảnh để chọn nhiều · kéo vào biểu tượng thư mục</span>
         </div>
+        <form asp-action="SharePhotos" method="post" id="photo-share-form" class="surface-card border p-3 mb-3">
+            @Html.AntiForgeryToken()
+            <input asp-for="ShareInput.ImageIds" type="hidden" id="photo-share-image-ids" />
+            <input asp-for="ShareInput.ReturnFolderId" type="hidden" />
+            <div class="d-flex flex-column flex-lg-row align-items-lg-end gap-3">
+                <div class="flex-grow-1">
+                    <label asp-for="ShareInput.RecipientEmail" class="form-label small mb-1">Email người nhận</label>
+                    <input asp-for="ShareInput.RecipientEmail" class="form-control" type="email" placeholder="nguoinhan@email.com" autocomplete="off" />
+                    <div class="form-text">Chọn ảnh trong danh sách bên dưới rồi nhập email tài khoản nhận share.</div>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="small text-secondary" id="photo-share-selected-count">Chưa chọn ảnh nào</span>
+                    <button type="submit" class="btn btn-primary">Chia sẻ ảnh đã chọn</button>
+                </div>
+            </div>
+        </form>
     }
     <div class="photo-grid-responsive photo-grid-responsive--library" id="photo-grid" style="--photo-cols: @Model.Cols">
         @foreach (var fo in Model.ChildFolders)
@@ -363,6 +379,25 @@ else
             </nav>
         }
     </div>
+
+    @if (!Model.FolderId.HasValue && Model.SharedItems.Count > 0)
+    {
+        <section class="mt-5">
+            <div class="d-flex flex-column flex-md-row align-items-md-end justify-content-md-between gap-3 mb-3">
+                <div>
+                    <h2 class="h4 mb-1">Ảnh được chia sẻ với bạn</h2>
+                    <p class="text-secondary mb-0">Mỗi ảnh đều hiển thị người đã chia sẻ cho bạn.</p>
+                </div>
+                <span class="small text-secondary">@Model.SharedItems.Count ảnh được chia sẻ</span>
+            </div>
+            <div class="photo-grid-responsive photo-grid-responsive--library" style="--photo-cols: @Model.Cols">
+                @foreach (var item in Model.SharedItems)
+                {
+                    @await Html.PartialAsync("_SharedPhotoCard", item, new ViewDataDictionary(ViewData) { ["CompactGrid"] = compactGrid })
+                }
+            </div>
+        </section>
+    }
 }
 
 @section Scripts {
@@ -668,6 +703,7 @@ else
                     if (!t || !t.classList || !t.classList.contains('photo-select-cb')) return;
                     var card = t.closest('.photo-card');
                     if (card) card.classList.toggle('photo-card--selected', t.checked);
+                    updateShareSelectionUi();
                 });
                 grid.addEventListener('click', function (e) {
                     var copyBtn = e.target.closest('.photo-copy-url-btn');
@@ -699,6 +735,7 @@ else
                     if (!cbx) return;
                     cbx.checked = !cbx.checked;
                     card.classList.toggle('photo-card--selected', cbx.checked);
+                    updateShareSelectionUi();
                 });
                 grid.addEventListener('dragstart', function (e) {
                     var card = e.target.closest('.photo-card');
@@ -763,6 +800,7 @@ else
                         var card = cb.closest('.photo-card');
                         if (card) card.classList.add('photo-card--selected');
                     });
+                    updateShareSelectionUi();
                 });
             }
             var clearBtn = document.getElementById('photo-clear-selection');
@@ -774,7 +812,44 @@ else
                         var card = cb.closest('.photo-card');
                         if (card) card.classList.remove('photo-card--selected');
                     });
+                    updateShareSelectionUi();
                 });
+            }
+
+            function updateShareSelectionUi() {
+                var countEl = document.getElementById('photo-share-selected-count');
+                var hiddenEl = document.getElementById('photo-share-image-ids');
+                if (!countEl && !hiddenEl) return;
+
+                var ids = [];
+                document.querySelectorAll('#photo-grid .photo-select-cb:checked').forEach(function (cb) {
+                    var card = cb.closest('.photo-card');
+                    if (!card) return;
+                    var id = card.getAttribute('data-photo-id');
+                    if (id && ids.indexOf(id) === -1) ids.push(id);
+                });
+
+                if (countEl) {
+                    countEl.textContent = ids.length > 0 ? ('Đã chọn ' + ids.length + ' ảnh') : 'Chưa chọn ảnh nào';
+                }
+
+                if (hiddenEl) {
+                    hiddenEl.value = ids.join(',');
+                }
+            }
+
+            var shareForm = document.getElementById('photo-share-form');
+            if (shareForm && !shareForm._photoBound) {
+                shareForm._photoBound = true;
+                shareForm.addEventListener('submit', function (e) {
+                    updateShareSelectionUi();
+                    var hiddenEl = document.getElementById('photo-share-image-ids');
+                    if (!hiddenEl || !hiddenEl.value) {
+                        e.preventDefault();
+                        window.alert('Hãy chọn ít nhất một ảnh để chia sẻ.');
+                    }
+                });
+                updateShareSelectionUi();
             }
 
             async function poll() {
@@ -828,6 +903,7 @@ else
                         var photoHtml = items.map(function (it) { return buildCardHtml(it, cg, vf); }).join('');
                         grid.innerHTML = folderHtml + photoHtml;
                         updatePendingSlowNotes();
+                        updateShareSelectionUi();
                         if (typeof window.photoApplyFolderSearch === 'function') window.photoApplyFolderSearch();
                     }
 
@@ -863,6 +939,7 @@ else
 
             setInterval(poll, pollMs);
             updatePendingSlowNotes();
+            updateShareSelectionUi();
             setInterval(updatePendingSlowNotes, 30000);
             ensurePhotoExplorerDelegate();
         })();
